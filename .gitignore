@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# generated tool output (not source code)
+graphify-out/
+
+# local claude configuration
+.claudignore
+.claude/
+CLAUDE.md
+AGENTS.md

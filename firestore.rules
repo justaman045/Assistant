@@ -1,0 +1,119 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // ── User profiles ─────────────────────────────────────────────────────────
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      match /memories/{memoryId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /usage/{usageId} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    // ── Content items + version history ──────────────────────────────────────
+    match /items/{itemId} {
+      allow read, delete: if isAuth() && request.auth.uid == resource.data.uid;
+
+      allow create: if isAuth()
+        && request.auth.uid == request.resource.data.uid
+        && request.resource.data.keys().hasAll(["uid", "title", "content", "createdAt"]);
+
+      allow update: if isAuth()
+        && request.auth.uid == resource.data.uid
+        && request.auth.uid == request.resource.data.uid;
+
+      match /versions/{versionId} {
+        allow read, delete: if isAuth() && request.auth.uid == resource.data.uid;
+        allow write: if isAuth() && request.auth.uid == request.resource.data.uid;
+      }
+    }
+
+    // ── Planner tasks ─────────────────────────────────────────────────────────
+    match /tasks/{taskId} {
+      allow read, delete: if isAuth() && request.auth.uid == resource.data.uid;
+      allow create: if isAuth() && request.auth.uid == request.resource.data.uid;
+      allow update: if isAuth()
+        && request.auth.uid == resource.data.uid
+        && request.auth.uid == request.resource.data.uid;
+    }
+
+    // ── Finance transactions ──────────────────────────────────────────────────
+    match /transactions/{txId} {
+      allow read, delete: if isAuth() && request.auth.uid == resource.data.uid;
+      allow create: if isAuth() && request.auth.uid == request.resource.data.uid;
+      allow update: if isAuth()
+        && request.auth.uid == resource.data.uid
+        && request.auth.uid == request.resource.data.uid;
+    }
+
+    // ── Managed subscriptions ─────────────────────────────────────────────────
+    match /managedSubscriptions/{subId} {
+      allow read, delete: if isAuth() && request.auth.uid == resource.data.uid;
+      allow create: if isAuth() && request.auth.uid == request.resource.data.uid;
+      allow update: if isAuth()
+        && request.auth.uid == resource.data.uid
+        && request.auth.uid == request.resource.data.uid;
+    }
+
+    // ── Roleplay partners + messages ──────────────────────────────────────────
+    match /roleplayPartners/{partnerId} {
+      allow read, delete: if isAuth() && request.auth.uid == resource.data.uid;
+      allow create: if isAuth() && request.auth.uid == request.resource.data.uid;
+      allow update: if isAuth()
+        && request.auth.uid == resource.data.uid
+        && request.auth.uid == request.resource.data.uid;
+
+      match /messages/{messageId} {
+        allow read, write: if isAuth()
+          && request.auth.uid == get(/databases/$(database)/documents/roleplayPartners/$(partnerId)).data.uid;
+      }
+    }
+
+    // ── Payments — written by Admin SDK webhook only, no client access ────────
+    match /payments/{paymentId} {
+      allow read, write: if false;
+    }
+
+    // ── Admin config (API keys etc.) — Admin SDK only, no client access ───────
+    match /adminConfig/{docId} {
+      allow read, write: if false;
+    }
+
+    // ── Model usage logs — written by Admin SDK, no client access ─────────────
+    match /modelUsageLogs/{logId} {
+      allow read, write: if false;
+    }
+
+    // ── Crash reports ─────────────────────────────────────────────────────────
+    match /crashes/{crashId} {
+      allow create: if isAuth();
+      allow read, update, delete: if false;
+    }
+
+    // ── App config — read-only for auth users, written by Admin SDK ───────────
+    match /config/{configId} {
+      allow read: if isAuth();
+      allow write: if false;
+    }
+
+    // ── Deny everything else ──────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
