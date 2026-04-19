@@ -20,15 +20,34 @@ export type MemoryCategory =
   | "audience"
   | "topics"
   | "preference"
-  | "personal";
+  | "personal"
+  | "rule";
 
 export interface Memory {
   id: string;
   content: string;
   category: MemoryCategory;
-  source: string;         // topic/prompt that produced this memory
+  source: string;
+  type?: "auto" | "manual";
   createdAt: Timestamp;
   usageCount: number;
+}
+
+export async function addManualMemory(
+  uid: string,
+  content: string,
+  category: MemoryCategory
+): Promise<Memory> {
+  const col = collection(db, "users", uid, "memories");
+  const ref = await addDoc(col, {
+    content, category, source: "manual", type: "manual",
+    usageCount: 0, createdAt: serverTimestamp(),
+  });
+  return { id: ref.id, content, category, source: "manual", type: "manual", usageCount: 0, createdAt: serverTimestamp() as unknown as Timestamp };
+}
+
+export async function updateMemory(uid: string, memoryId: string, content: string): Promise<void> {
+  await updateDoc(doc(db, "users", uid, "memories", memoryId), { content });
 }
 
 export const CATEGORY_META: Record<
@@ -64,6 +83,11 @@ export const CATEGORY_META: Record<
     label: "Personal",
     color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400",
     description: "Values and perspectives you've shared",
+  },
+  rule: {
+    label: "Rule",
+    color: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400",
+    description: "Hard rules and things to always remember",
   },
 };
 

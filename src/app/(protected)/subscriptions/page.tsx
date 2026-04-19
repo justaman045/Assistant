@@ -9,7 +9,7 @@ import {
   buildSubscriptionContext, monthlyEquivalent, SUB_CATEGORIES,
 } from "@/lib/subscriptions-manager";
 import { ManagedSubscription, BillingCycle, SubscriptionStatus } from "@/lib/types";
-import { DEFAULT_MODEL } from "@/lib/openrouter";
+import { DEFAULT_MODEL, OpenRouterModel } from "@/lib/openrouter";
 import { Plus, Trash2, Sparkles, X, Loader2, Pencil, Check, AlertTriangle } from "lucide-react";
 
 const BILLING_CYCLES: BillingCycle[] = ["weekly", "monthly", "annual", "one-time"];
@@ -45,6 +45,11 @@ export default function SubscriptionsPage() {
   const [question, setQuestion] = useState("Which subscriptions should I drop? Consider my notes.");
   const [aiResponse, setAiResponse] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
+  const [aiModel, setAiModel] = useState(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("subscriptions_model") ?? DEFAULT_MODEL;
+    return DEFAULT_MODEL;
+  });
+  const [models, setModels] = useState<OpenRouterModel[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const [memories, setMemories] = useState<Memory[]>([]);
 
@@ -52,6 +57,7 @@ export default function SubscriptionsPage() {
     if (!user) return;
     fetchSubscriptions(user.uid).then(setSubs).finally(() => setLoading(false));
     fetchMemories(user.uid).then(setMemories).catch(() => {});
+    fetch("/api/models").then((r) => r.json()).then(setModels).catch(() => {});
   }, [user]);
 
   async function extractAndSaveMemory(uid: string, token: string, q: string, response: string) {
@@ -127,7 +133,7 @@ export default function SubscriptionsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          subscriptions: context, question: question.trim(), model: DEFAULT_MODEL,
+          subscriptions: context, question: question.trim(), model: aiModel,
           memories: memories.map((m) => m.content),
         }),
         signal: abortRef.current.signal,
@@ -346,6 +352,15 @@ export default function SubscriptionsPage() {
               <div className="rounded-xl bg-indigo-50 p-4 text-sm text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300">
                 <p className="font-medium">All {subs.length} subscriptions will be analyzed.</p>
                 <p className="mt-0.5 text-xs opacity-80">The AI will respect your notes — e.g. "family plan" or "can&apos;t drop".</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="shrink-0 text-xs text-gray-500">Model:</label>
+                <select value={aiModel} onChange={(e) => { setAiModel(e.target.value); localStorage.setItem("subscriptions_model", e.target.value); }}
+                  className="rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                  {models.length === 0
+                    ? <option value={DEFAULT_MODEL}>{DEFAULT_MODEL}</option>
+                    : models.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
               </div>
               <div className="flex gap-2">
                 <input type="text" value={question} onChange={(e) => setQuestion(e.target.value)}

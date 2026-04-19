@@ -66,7 +66,10 @@ export default function PlannerPage() {
   const [aiQuestion, setAiQuestion] = useState("");
   const [aiResponse, setAiResponse] = useState("");
   const [aiStreaming, setAiStreaming] = useState(false);
-  const [aiModel, setAiModel] = useState(DEFAULT_MODEL);
+  const [aiModel, setAiModel] = useState(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("planner_model") ?? DEFAULT_MODEL;
+    return DEFAULT_MODEL;
+  });
   const [models, setModels] = useState<OpenRouterModel[]>([]);
   const [memories, setMemories] = useState<Memory[]>([]);
 
@@ -394,7 +397,7 @@ export default function PlannerPage() {
           {/* Model selector */}
           <div className="flex items-center gap-2">
             <label className="shrink-0 text-xs text-gray-500">Model:</label>
-            <select value={aiModel} onChange={(e) => setAiModel(e.target.value)}
+            <select value={aiModel} onChange={(e) => { setAiModel(e.target.value); localStorage.setItem("planner_model", e.target.value); }}
               className="flex-1 rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300">
               {models.length === 0
                 ? <option value={DEFAULT_MODEL}>{DEFAULT_MODEL}</option>

@@ -43,6 +43,7 @@ export default function RoleplayChatPage() {
       const found = ps.find((p) => p.id === partnerId);
       if (!found) { router.replace("/roleplay"); return; }
       setPartner(found);
+      if (found.model) setModel(found.model);
       // Load memories if enabled
       if (found.memoryEnabled) {
         fetchMemories(user.uid).then(setMemories).catch(() => {});
@@ -236,7 +237,10 @@ export default function RoleplayChatPage() {
           </button>
 
           <div className="w-52 min-w-0">
-            <ModelPicker models={models} value={model} onChange={setModel} loading={models.length === 0} error="" />
+            <ModelPicker models={models} value={model} onChange={(m) => {
+              setModel(m);
+              updatePartner(partnerId, { model: m }).catch(() => {});
+            }} loading={models.length === 0} error="" />
           </div>
 
           <button

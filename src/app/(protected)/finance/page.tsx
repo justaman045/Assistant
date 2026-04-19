@@ -9,7 +9,7 @@ import {
   summarize, buildAnalysisContext, EXPENSE_CATEGORIES, INCOME_CATEGORIES,
 } from "@/lib/finance";
 import { FinanceTransaction, TransactionType } from "@/lib/types";
-import { DEFAULT_MODEL } from "@/lib/openrouter";
+import { DEFAULT_MODEL, OpenRouterModel } from "@/lib/openrouter";
 import { Plus, Trash2, Sparkles, TrendingUp, TrendingDown, X, Loader2, Check } from "lucide-react";
 
 type Tab = "transactions" | "analysis";
@@ -40,6 +40,11 @@ export default function FinancePage() {
   const [question, setQuestion] = useState("");
   const [aiResponse, setAiResponse] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
+  const [aiModel, setAiModel] = useState(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("finance_model") ?? DEFAULT_MODEL;
+    return DEFAULT_MODEL;
+  });
+  const [models, setModels] = useState<OpenRouterModel[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const [memories, setMemories] = useState<Memory[]>([]);
 
@@ -47,6 +52,7 @@ export default function FinancePage() {
     if (!user) return;
     fetchTransactions(user.uid).then(setTransactions).finally(() => setLoading(false));
     fetchMemories(user.uid).then(setMemories).catch(() => {});
+    fetch("/api/models").then((r) => r.json()).then(setModels).catch(() => {});
   }, [user]);
 
   async function extractAndSaveMemory(uid: string, token: string, q: string, response: string) {
@@ -111,7 +117,7 @@ export default function FinancePage() {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          transactions: context, question: question.trim(), model: DEFAULT_MODEL,
+          transactions: context, question: question.trim(), model: aiModel,
           memories: memories.map((m) => m.content),
         }),
         signal: abortRef.current.signal,
@@ -302,6 +308,15 @@ export default function FinancePage() {
             ))}
           </div>
 
+          <div className="flex items-center gap-2">
+            <label className="shrink-0 text-xs text-gray-500">Model:</label>
+            <select value={aiModel} onChange={(e) => { setAiModel(e.target.value); localStorage.setItem("finance_model", e.target.value); }}
+              className="rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300">
+              {models.length === 0
+                ? <option value={DEFAULT_MODEL}>{DEFAULT_MODEL}</option>
+                : models.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          </div>
           <div className="flex gap-2">
             <input type="text" value={question} onChange={(e) => setQuestion(e.target.value)}
               placeholder="e.g. Where am I overspending? How can I save more?"

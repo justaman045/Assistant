@@ -60,6 +60,7 @@ export interface RoleplayPartner {
   systemPrompt?: string;
   avatar: string;
   memoryEnabled: boolean;
+  model?: string;
   createdAt: Timestamp | null;
 }
 
@@ -121,6 +122,43 @@ export interface ManagedSubscription {
   status: SubscriptionStatus;
   emoji?: string;
   createdAt: Timestamp | null;
+}
+
+// ─── AI Assistant ─────────────────────────────────────────────────────────────
+
+export interface Assistant {
+  id: string;
+  uid: string;
+  name: string;
+  emoji: string;
+  personality: string;
+  description?: string;
+  systemPrompt?: string;
+  model?: string;
+  createdAt: Timestamp | null;
+}
+
+export interface ActionRecord {
+  tool: string;
+  label: string;
+  success: boolean;
+}
+
+export interface AssistantMessage {
+  role: "user" | "assistant";
+  content: string;
+  actions?: ActionRecord[];
+  createdAt: number;
+}
+
+export interface AssistantChat {
+  id: string;
+  uid: string;
+  assistantId: string;
+  title: string;
+  messages: AssistantMessage[];
+  createdAt: Timestamp | null;
+  updatedAt: Timestamp | null;
 }
 
 export type VersionSource = "initial" | "edit" | "regenerated" | "restored";

@@ -9,6 +9,11 @@ export interface OpenRouterModel {
     prompt: string;
     completion: string;
   };
+  supported_parameters?: string[];
+}
+
+export function supportsTools(model: OpenRouterModel): boolean {
+  return model.supported_parameters?.includes("tools") ?? false;
 }
 
 export function formatContext(n: number): string {

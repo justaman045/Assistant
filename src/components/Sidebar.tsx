@@ -8,10 +8,11 @@ import { signOutUser } from "@/lib/auth";
 import {
   LayoutDashboard, FileText, Sparkles, MessageSquare,
   CheckSquare, Wallet, Package, Brain, Gift, Settings,
-  CreditCard, LogOut, Sun, Moon, Monitor, Zap, ScrollText,
+  CreditCard, LogOut, Sun, Moon, Monitor, Zap, ScrollText, Bot,
 } from "lucide-react";
 
 const MODULES = [
+  { href: "/assistants", label: "Assistants", icon: Bot, match: "/assistants" },
   { href: "/content/apps", label: "Content", icon: FileText, match: "/content" },
   { href: "/roleplay", label: "Roleplay", icon: MessageSquare, match: "/roleplay" },
   { href: "/planner", label: "Planner", icon: CheckSquare, match: "/planner" },
