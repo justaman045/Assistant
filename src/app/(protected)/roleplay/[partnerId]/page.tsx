@@ -6,13 +6,15 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import {
   fetchPartners, fetchMessages, addMessage, clearMessages,
-  buildSystemPrompt, CATEGORY_LABELS, updatePartner,
+  buildSystemPrompt, CATEGORY_LABELS, ROLEPLAY_LANGUAGES, updatePartner,
 } from "@/lib/roleplay";
 import { RoleplayPartner, RoleplayMessage } from "@/lib/types";
 import { DEFAULT_MODEL, OpenRouterModel } from "@/lib/openrouter";
 import { fetchMemories, saveMemories, Memory } from "@/lib/memory";
 import ModelPicker from "@/components/ModelPicker";
-import { ArrowLeft, Send, Loader2, Trash2, Brain } from "lucide-react";
+import { ArrowLeft, Send, Loader2, Trash2, Brain, Globe } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import Link from "next/link";
 
 export default function RoleplayChatPage() {
@@ -34,6 +36,9 @@ export default function RoleplayChatPage() {
   const [memories, setMemories] = useState<Memory[]>([]);
   const [togglingMemory, setTogglingMemory] = useState(false);
 
+  // Language state — persisted per partner in localStorage
+  const [language, setLanguage] = useState("auto");
+
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -54,6 +59,8 @@ export default function RoleplayChatPage() {
       setLoadingHistory(false);
     });
     fetch("/api/models").then((r) => r.json()).then(setModels).catch(() => {});
+    const saved = localStorage.getItem(`roleplay_lang_${partnerId}`);
+    if (saved) setLanguage(saved);
   }, [user, partnerId, router]);
 
   useEffect(() => {
@@ -95,7 +102,7 @@ export default function RoleplayChatPage() {
     const memoryContext = partner.memoryEnabled && memories.length > 0
       ? memories.map((m) => `• ${m.content}`).join("\n")
       : undefined;
-    const systemPrompt = buildSystemPrompt(partner, memoryContext);
+    const systemPrompt = buildSystemPrompt(partner, memoryContext, language);
 
     setStreaming(true);
     let responseText = "";
@@ -113,7 +120,7 @@ export default function RoleplayChatPage() {
       });
 
       if (res.status === 402) {
-        toast("Not enough credits", "error");
+        toast("Not enough tokens. Top up in Billing.", "error");
         setMessages((prev) => prev.filter((m) => m.id !== assistantId));
         return;
       }
@@ -199,57 +206,70 @@ export default function RoleplayChatPage() {
   );
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col gap-0">
+    <div className="flex h-[calc(100dvh-8rem)] flex-col gap-0 md:h-[calc(100vh-8rem)]">
       {/* Header */}
-      <div className="flex items-center justify-between rounded-t-2xl bg-white px-5 py-4 shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700">
-        <div className="flex items-center gap-3">
-          <Link href="/roleplay" className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-          <span className="text-2xl">{partner.avatar}</span>
-          <div>
-            <p className="font-semibold text-gray-900 dark:text-gray-100">{partner.name}</p>
-            <p className="text-xs text-gray-400">{CATEGORY_LABELS[partner.category]}</p>
+      <div className="rounded-t-2xl bg-white shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700">
+        {/* Top row: back + partner info + clear */}
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <Link href="/roleplay" className="shrink-0 text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+            <span className="shrink-0 text-2xl">{partner.avatar}</span>
+            <div className="min-w-0">
+              <p className="truncate font-semibold text-gray-900 dark:text-gray-100">{partner.name}</p>
+              <p className="text-xs text-gray-400">{CATEGORY_LABELS[partner.category]}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0 ml-2">
+            {/* Memory toggle */}
+            <button
+              onClick={toggleMemory}
+              disabled={togglingMemory}
+              title={partner.memoryEnabled ? "Memory ON" : "Memory OFF"}
+              className={`flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors ${
+                partner.memoryEnabled
+                  ? "bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:text-indigo-400"
+                  : "bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-500"
+              }`}
+            >
+              {togglingMemory ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Brain className="h-3.5 w-3.5" />}
+              {partner.memoryEnabled && memories.length > 0 && (
+                <span className="rounded-full bg-indigo-100 px-1 text-[10px] dark:bg-indigo-900">{memories.length}</span>
+              )}
+            </button>
+            <button
+              onClick={handleClear}
+              title="Clear chat"
+              className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
           </div>
         </div>
-
-        <div className="flex items-center gap-2">
-          {/* Memory toggle */}
-          <button
-            onClick={toggleMemory}
-            disabled={togglingMemory}
-            title={partner.memoryEnabled ? "Memory learning ON — click to disable" : "Memory learning OFF — click to enable"}
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              partner.memoryEnabled
-                ? "bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:text-indigo-400"
-                : "bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-500"
-            }`}
-          >
-            {togglingMemory
-              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              : <Brain className="h-3.5 w-3.5" />}
-            <span className="hidden sm:inline">{partner.memoryEnabled ? "Memory on" : "Memory off"}</span>
-            {partner.memoryEnabled && memories.length > 0 && (
-              <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] dark:bg-indigo-900">
-                {memories.length}
-              </span>
-            )}
-          </button>
-
-          <div className="w-52 min-w-0">
+        {/* Bottom row: language + model */}
+        <div className="flex items-center gap-2 border-t border-gray-100 px-4 py-2 dark:border-gray-800">
+          <div className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 dark:border-gray-700 dark:bg-gray-800">
+            <Globe className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+            <select
+              value={language}
+              onChange={(e) => {
+                setLanguage(e.target.value);
+                localStorage.setItem(`roleplay_lang_${partnerId}`, e.target.value);
+              }}
+              className="bg-transparent text-xs font-medium text-gray-700 focus:outline-none dark:text-gray-300"
+            >
+              {ROLEPLAY_LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>{l.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-1 min-w-0">
             <ModelPicker models={models} value={model} onChange={(m) => {
               setModel(m);
               updatePartner(partnerId, { model: m }).catch(() => {});
             }} loading={models.length === 0} error="" />
           </div>
-
-          <button
-            onClick={handleClear}
-            title="Clear chat"
-            className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
         </div>
       </div>
 
@@ -282,7 +302,27 @@ export default function RoleplayChatPage() {
                     ? "bg-indigo-600 text-white"
                     : "bg-white text-gray-800 shadow-sm ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700"
                 }`}>
-                  {msg.content || (streaming ? <span className="inline-block h-4 w-0.5 animate-pulse bg-current align-text-bottom" /> : "")}
+                  {msg.content ? (
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                        em: ({ children }) => <em className="italic">{children}</em>,
+                        ul: ({ children }) => <ul className="mb-2 ml-4 list-disc space-y-0.5 last:mb-0">{children}</ul>,
+                        ol: ({ children }) => <ol className="mb-2 ml-4 list-decimal space-y-0.5 last:mb-0">{children}</ol>,
+                        li: ({ children }) => <li>{children}</li>,
+                        code: ({ children }) => <code className="rounded bg-black/10 px-1 py-0.5 font-mono text-xs dark:bg-white/10">{children}</code>,
+                        h1: ({ children }) => <p className="mb-1 font-bold text-base">{children}</p>,
+                        h2: ({ children }) => <p className="mb-1 font-bold">{children}</p>,
+                        h3: ({ children }) => <p className="mb-1 font-semibold">{children}</p>,
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
+                  ) : (
+                    streaming ? <span className="inline-block h-4 w-0.5 animate-pulse bg-current align-text-bottom" /> : ""
+                  )}
                 </div>
               </div>
             ))}

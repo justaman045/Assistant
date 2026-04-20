@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { getActiveApiKey } from "@/lib/openrouter-keys";
 import { logModelUsage } from "@/lib/model-usage";
 import { openRouterErrorResponse } from "@/lib/openrouter-error";
-import { enforceCredits } from "@/lib/enforce-credits";
+import { enforceTokens, deductTokens, interceptTokenUsage } from "@/lib/tokens";
 
 export const runtime = "nodejs";
 
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   };
   if (!subscriptions || !question || !model) return new Response("Missing fields", { status: 400 });
 
-  const credit = await enforceCredits(req, model, `subscriptions:${model}`);
+  const credit = await enforceTokens(req, "subscriptions");
   if (credit.error) return credit.error;
 
   let systemPrompt = `You are a subscription optimization advisor. The user will share their subscriptions (including personal notes explaining why some are kept). Respect those notes — if the user says "can't drop" or gives a family/shared reason, do NOT recommend dropping that subscription. Be specific and practical. Format your response clearly.`;
@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
     body: JSON.stringify({
       model,
       stream: true,
+      stream_options: { include_usage: true },
       messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
     }),
   });
@@ -47,7 +48,10 @@ export async function POST(req: NextRequest) {
 
   logModelUsage(model, "subscriptions", credit.uid).catch(() => {});
 
-  return new Response(upstream.body, {
+  const body = interceptTokenUsage(upstream, (n) =>
+    deductTokens(credit.uid, n).catch((e) => console.error("[subscriptions] token deduction:", e))
+  );
+  return new Response(body, {
     headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "X-Accel-Buffering": "no" },
   });
 }

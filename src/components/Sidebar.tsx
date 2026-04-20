@@ -91,8 +91,8 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const { user, userProfile } = useAuth();
   const { theme, setTheme } = useTheme();
 
-  const credits = userProfile?.credits ?? 0;
-  const isLow = credits < 20;
+  const tokens = (userProfile?.tokens ?? userProfile?.credits ?? 0);
+  const isLow = tokens < 10_000;
 
   function isActive(href: string, match?: string) {
     const base = match ?? href;
@@ -160,7 +160,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
               <p className={`text-xs font-semibold leading-none ${
                 isLow ? "text-red-700 dark:text-red-400" : "text-gray-700 dark:text-gray-300"
               }`}>
-                {credits.toLocaleString()} credits
+                {tokens >= 1_000 ? `${(tokens / 1000).toFixed(1)}K` : tokens.toLocaleString()} tokens
               </p>
               <p className="mt-0.5 text-[10px] leading-none text-gray-400 dark:text-gray-500">
                 {isLow ? "Running low · top up" : "available balance"}

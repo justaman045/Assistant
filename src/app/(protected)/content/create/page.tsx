@@ -165,10 +165,8 @@ export default function CreatePage() {
 
       if (res.status === 402) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(
-          `Not enough credits. This model costs ${data.cost ?? 10} credits per generation. ` +
-          `Top up in Billing.`
-        );
+        const bal = data.balance != null ? ` (you have ${data.balance.toLocaleString()})` : "";
+        throw new Error(`Not enough tokens${bal}. Top up in Billing.`);
       }
       if (res.status === 429) {
         throw new Error("Too many requests. Please wait a moment before generating again.");

@@ -166,11 +166,9 @@ export default function CreatePage() {
 
       if (res.status === 402) {
         const data = await res.json().catch(() => ({}));
-        if (data.error === "INSUFFICIENT_CREDITS") {
-          const bal = data.balance != null ? ` (you have ${data.balance})` : "";
-          throw new Error(
-            `Not enough credits${bal}. This model costs ${data.cost ?? 10} credits per generation. Top up in Billing.`
-          );
+        if (data.error === "INSUFFICIENT_TOKENS") {
+          const bal = data.balance != null ? ` (you have ${data.balance.toLocaleString()})` : "";
+          throw new Error(`Not enough tokens${bal}. Top up in Billing.`);
         }
         throw new Error(data.error ?? "Payment required");
       }

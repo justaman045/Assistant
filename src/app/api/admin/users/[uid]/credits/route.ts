@@ -26,17 +26,18 @@ export async function POST(
     const snap = await tx.get(userRef);
     if (!snap.exists) throw new Error("User not found");
 
-    const currentCredits: number = snap.data()?.credits ?? 0;
+    const data = snap.data() ?? {};
+    const currentTokens: number = data.tokens ?? data.credits ?? 0;
 
-    // Don't let credits go below 0
-    const newBalance = Math.max(0, currentCredits + amount);
-    const actualChange = newBalance - currentCredits;
+    // Don't let tokens go below 0
+    const newBalance = Math.max(0, currentTokens + amount);
+    const actualChange = newBalance - currentTokens;
 
     tx.update(userRef, {
-      credits: newBalance,
-      // If we removed credits, add them to creditsUsed for accounting
+      tokens: newBalance,
+      // If we removed tokens, add them to tokensUsed for accounting
       ...(actualChange < 0 && {
-        creditsUsed: FieldValue.increment(Math.abs(actualChange)),
+        tokensUsed: FieldValue.increment(Math.abs(actualChange)),
       }),
     });
 
@@ -57,5 +58,6 @@ export async function POST(
   });
 
   const updated = await userRef.get();
-  return Response.json({ ok: true, credits: updated.data()?.credits ?? 0 });
+  const updatedData = updated.data() ?? {};
+  return Response.json({ ok: true, tokens: updatedData.tokens ?? updatedData.credits ?? 0 });
 }

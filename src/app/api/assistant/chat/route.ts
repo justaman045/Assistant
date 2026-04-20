@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { adminAuth, adminDb, FieldValue } from "@/lib/firebase-admin";
 import { getActiveApiKey } from "@/lib/openrouter-keys";
-import { enforceCredits } from "@/lib/enforce-credits";
+import { enforceTokens, deductTokens } from "@/lib/tokens";
 import { logModelUsage } from "@/lib/model-usage";
 
 export const runtime = "nodejs";
@@ -443,7 +443,7 @@ export async function POST(req: NextRequest) {
     memories?: string[];
   };
 
-  const credit = await enforceCredits(req, model, `assistant:${uid}`);
+  const credit = await enforceTokens(req, "assistant");
   if (credit.error) return credit.error;
 
   let system: string;
@@ -512,6 +512,7 @@ Before calling save_memory, check the memories already shown below. If the new m
       const send = (obj: object) =>
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
 
+      let totalTokensUsed = 0;
       try {
         const llmMessages: Array<{
           role: string;
@@ -551,6 +552,7 @@ Before calling save_memory, check the memories already shown below. If the new m
           }
 
           const json = await res.json();
+          totalTokensUsed += json.usage?.total_tokens ?? 0;
           const msg = json.choices?.[0]?.message;
           if (!msg) break;
 
@@ -600,6 +602,12 @@ Before calling save_memory, check the memories already shown below. If the new m
       } catch (e) {
         send({ type: "error", text: (e as Error).message });
         controller.close();
+      } finally {
+        if (totalTokensUsed > 0) {
+          deductTokens(credit.uid, totalTokensUsed).catch((e) =>
+            console.error("[assistant/chat] token deduction:", e)
+          );
+        }
       }
     },
   });

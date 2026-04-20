@@ -110,7 +110,7 @@ export default function ModelUsagePage() {
       ) : (
         <>
           {/* Summary cards */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
               <div className="flex items-start justify-between">
                 <p className="text-xs font-medium text-gray-400">Total Requests</p>

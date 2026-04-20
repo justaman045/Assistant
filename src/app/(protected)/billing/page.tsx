@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
-import { CREDIT_PACKS, CreditPack } from "@/lib/credits";
+import { TOKEN_PACKS, TokenPack } from "@/lib/credits";
 import { Zap, Check, AlertTriangle, Loader2, ShoppingCart, X, Sparkles, Star } from "lucide-react";
 import { PLANS, annualSavings } from "@/lib/plans";
 
@@ -44,9 +44,9 @@ export default function BillingPage() {
     setBannerDismissed(true);
   }
 
-  const credits = userProfile?.credits ?? 0;
-  const creditsUsed = userProfile?.creditsUsed ?? 0;
-  const isLow = credits < 20;
+  const tokens = userProfile?.tokens ?? userProfile?.credits ?? 0;
+  const tokensUsed = userProfile?.tokensUsed ?? userProfile?.creditsUsed ?? 0;
+  const isLow = tokens < 10_000;
   const razorpayConfigured = !!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
 
   async function handleSubscribe(planId: string) {
@@ -80,7 +80,7 @@ export default function BillingPage() {
           description: `${planId.charAt(0).toUpperCase() + planId.slice(1)} plan — ${billingCycle}`,
           theme: { color: "#4f46e5" },
           handler: () => {
-            toast("Subscription activated! Credits will be added shortly.", "success");
+            toast("Subscription activated! Tokens will be added shortly.", "success");
             resolve();
           },
           modal: { ondismiss: () => reject(new Error("dismissed")) },
@@ -95,7 +95,7 @@ export default function BillingPage() {
     }
   }
 
-  async function handleBuy(pack: CreditPack) {
+  async function handleBuy(pack: TokenPack) {
     if (!user) return;
     setLoading(pack.id);
 
@@ -121,7 +121,7 @@ export default function BillingPage() {
           key: keyId,
           order_id: orderId,
           name: "Personal Dashboard",
-          description: `${pack.name} — ${pack.credits.toLocaleString()} credits`,
+          description: `${pack.name} — ${(pack.tokens / 1000).toFixed(0)}K tokens`,
           amount: pack.price * 100,
           currency: "INR",
           theme: { color: "#4f46e5" },
@@ -141,7 +141,7 @@ export default function BillingPage() {
               });
               if (!verifyRes.ok) throw new Error("Payment verification failed");
               await verifyRes.json();
-              toast(`${pack.credits.toLocaleString()} credits added to your account!`, "success");
+              toast(`${(pack.tokens / 1000).toFixed(0)}K tokens added to your account!`, "success");
               resolve();
             } catch (e) {
               reject(e);
@@ -168,7 +168,7 @@ export default function BillingPage() {
           <div className="flex-1">
             <p className="font-semibold">Monthly subscriptions are now available!</p>
             <p className="mt-0.5 text-sm text-indigo-200">
-              Get credits automatically every month at a lower per-credit price. Switch to a subscription plan and save more.
+              Get tokens automatically every month at a lower per-token price. Switch to a subscription plan and save more.
             </p>
             <button
               onClick={() => document.getElementById("subscription-plans")?.scrollIntoView({ behavior: "smooth" })}
@@ -188,23 +188,23 @@ export default function BillingPage() {
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Billing & Credits</h1>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 sm:text-2xl">Billing & Tokens</h1>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Buy credits and track your usage. Pay only for what you use.
+          Buy tokens and track your usage. Charged based on actual AI token consumption.
         </p>
       </div>
 
       {/* Balance cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className={`rounded-xl p-6 shadow-sm ring-1 ${isLow ? "bg-red-50 ring-red-200 dark:bg-red-950/30 dark:ring-red-800" : "bg-white ring-gray-200 dark:bg-gray-900 dark:ring-gray-700"}`}>
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Credits Remaining</p>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Tokens Remaining</p>
             <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${isLow ? "bg-red-100 dark:bg-red-900" : "bg-indigo-50 dark:bg-indigo-950"}`}>
               <Zap className={`h-4 w-4 ${isLow ? "text-red-500" : "text-indigo-600 dark:text-indigo-400"}`} />
             </div>
           </div>
           <p className={`mt-2 text-3xl font-bold ${isLow ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-gray-100"}`}>
-            {credits.toLocaleString()}
+            {tokens >= 1_000 ? `${(tokens / 1000).toFixed(1)}K` : tokens.toLocaleString()}
           </p>
           {isLow && (
             <p className="mt-1 text-xs text-red-500">Low balance — top up to keep generating</p>
@@ -212,9 +212,9 @@ export default function BillingPage() {
         </div>
 
         <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700">
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Credits Used</p>
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Tokens Used</p>
           <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
-            {creditsUsed.toLocaleString()}
+            {tokensUsed >= 1_000 ? `${(tokensUsed / 1000).toFixed(1)}K` : tokensUsed.toLocaleString()}
           </p>
           <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">all time</p>
         </div>
@@ -226,21 +226,21 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {/* Credit cost info */}
+      {/* Token cost info */}
       <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-5 dark:border-indigo-900 dark:bg-indigo-950/40">
-        <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-300">Credit costs per generation</p>
+        <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-300">How tokens work</p>
         <div className="mt-2 flex flex-wrap gap-4 text-sm text-indigo-700 dark:text-indigo-400">
-          <span><strong>5 credits</strong> — free-tier AI models (e.g. Gemini Flash Free)</span>
-          <span><strong>10 credits</strong> — paid AI models (GPT-4o, Claude, etc.)</span>
+          <span>Tokens are deducted based on <strong>actual AI usage</strong> — 1 token = 1 OpenRouter token consumed.</span>
+          <span>You start with <strong>50,000 free tokens</strong>. Top up any time — tokens never expire.</span>
         </div>
       </div>
 
       {/* Subscription plans */}
       <div id="subscription-plans">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Subscription Plans</h2>
           {/* Monthly / Annual toggle */}
-          <div className="flex items-center overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+          <div className="flex w-full items-center overflow-hidden rounded-lg border border-gray-200 bg-white sm:w-auto dark:border-gray-700 dark:bg-gray-900">
             {(["monthly", "annual"] as const).map((cycle) => (
               <button
                 key={cycle}
@@ -262,7 +262,7 @@ export default function BillingPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {PLANS.map((plan) => {
             const price = billingCycle === "annual" ? plan.annualPrice : plan.monthlyPrice;
             const savings = annualSavings(plan);
@@ -344,9 +344,9 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {/* Credit packs */}
+      {/* Token packs */}
       <div>
-        <h2 className="mb-5 text-lg font-semibold text-gray-900 dark:text-gray-100">Buy Credits</h2>
+        <h2 className="mb-5 text-lg font-semibold text-gray-900 dark:text-gray-100">Buy Tokens</h2>
 
         {!razorpayConfigured && (
           <div className="mb-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400">
@@ -356,7 +356,7 @@ export default function BillingPage() {
         )}
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-          {CREDIT_PACKS.map((pack) => (
+          {TOKEN_PACKS.map((pack) => (
             <div
               key={pack.id}
               className="relative flex flex-col rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-200 transition-all hover:shadow-md dark:bg-gray-900 dark:ring-gray-700"
@@ -373,13 +373,13 @@ export default function BillingPage() {
                   <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">₹{pack.price}</span>
                   <span className="text-sm text-gray-400">one-time</span>
                 </div>
-                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{pack.perCredit}</p>
+                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{pack.perKTokens}</p>
               </div>
 
               <ul className="mb-6 flex-1 space-y-2">
                 <li className="flex items-center gap-2 text-sm">
                   <Check className="h-4 w-4 shrink-0 text-green-500 dark:text-green-400" />
-                  <span className="font-semibold text-gray-800 dark:text-gray-200">{pack.credits.toLocaleString()} credits</span>
+                  <span className="font-semibold text-gray-800 dark:text-gray-200">{(pack.tokens / 1000).toFixed(0)}K tokens</span>
                 </li>
                 <li className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                   <Check className="h-4 w-4 shrink-0 text-green-500 dark:text-green-400" />

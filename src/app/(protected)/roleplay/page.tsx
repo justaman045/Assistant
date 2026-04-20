@@ -184,11 +184,11 @@ export default function RoleplayPage() {
                       placeholder="e.g. A sarcastic Silicon Valley VC who only talks in startup jargon and dismisses every idea…"
                       className={`resize-none rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-indigo-800 dark:bg-gray-800 dark:text-gray-100 w-full`}
                     />
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                       <select
                         value={aiModel}
                         onChange={(e) => setAiModel(e.target.value)}
-                        className="flex-1 rounded-lg border border-indigo-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none dark:border-indigo-800 dark:bg-gray-800 dark:text-gray-300"
+                        className="w-full rounded-lg border border-indigo-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none dark:border-indigo-800 dark:bg-gray-800 dark:text-gray-300 sm:flex-1"
                       >
                         {models.length === 0
                           ? <option value={DEFAULT_MODEL}>{DEFAULT_MODEL}</option>
@@ -199,7 +199,7 @@ export default function RoleplayPage() {
                       <button
                         onClick={handleGenerateWithAI}
                         disabled={!aiDescription.trim() || generating}
-                        className="flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+                        className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-40 sm:w-auto sm:shrink-0"
                       >
                         {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                         {generating ? "Generating…" : "Generate"}

@@ -23,7 +23,10 @@ export interface UserProfile {
   referredBy?: string;
   plan?: "free" | "starter" | "pro" | "business";
   planExpiresAt?: import("firebase/firestore").Timestamp;
-  // Credits & billing
+  // Token balance (actual LLM token usage)
+  tokens?: number;
+  tokensUsed?: number;
+  // Legacy credit fields kept for backward-compat reads during migration
   credits?: number;
   creditsUsed?: number;
 }

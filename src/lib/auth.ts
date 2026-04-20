@@ -2,7 +2,7 @@ import { signInWithPopup, signOut, onAuthStateChanged, User } from "firebase/aut
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db, googleProvider } from "./firebase";
 import { logLogin } from "./analytics";
-import { FREE_SIGNUP_CREDITS } from "./credits";
+import { FREE_SIGNUP_TOKENS } from "./credits";
 import { generateReferralCode, claimReferral } from "./referral";
 
 export async function signInWithGoogle() {
@@ -38,8 +38,8 @@ export async function persistUser(user: User) {
       createdAt: serverTimestamp(),
       lastLoginAt: serverTimestamp(),
       onboardingComplete: false,
-      credits: FREE_SIGNUP_CREDITS,
-      creditsUsed: 0,
+      tokens: FREE_SIGNUP_TOKENS,
+      tokensUsed: 0,
       referralCode: generateReferralCode(user.uid),
     });
     // Fire-and-forget welcome email

@@ -146,7 +146,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Stat cards ─────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="Saved Items"           value={String(items.length)}             loading={loadingData}  icon={FileText}   color="indigo" />
         <StatCard label="Saved This Week"       value={String(itemsThisWeek)}            loading={loadingData}  icon={TrendingUp} color={itemsThisWeek > 0 ? "green" : "indigo"} />
         <StatCard label="Member Since"          value={memberSince}                      small                  icon={CalendarDays} color="slate" />
@@ -196,7 +196,7 @@ export default function DashboardPage() {
 
       {/* ── ROI metrics ─────────────────────────────────────────────────── */}
       {!loadingUsage && totalGenerations > 0 && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {[
             { label: "Estimated time saved", value: `~${Math.round(totalGenerations * 12)} min`, sub: "at ~12 min/generation" },
             { label: "Writing automated",    value: `~${(totalGenerations * 0.2).toFixed(1)} hrs`, sub: "of manual work" },

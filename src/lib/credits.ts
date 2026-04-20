@@ -1,47 +1,52 @@
-/** Credits deducted per generation, based on model tier. */
-export const GENERATION_COST = {
-  free_model: 5,   // model IDs ending in :free
-  paid_model: 10,  // everything else
-};
+/** Free tokens awarded to new users on signup. */
+export const FREE_SIGNUP_TOKENS = 50_000;
 
-export function getGenerationCost(modelId: string): number {
-  return modelId.includes(":free") ? GENERATION_COST.free_model : GENERATION_COST.paid_model;
-}
+/** Minimum token balance required to start a generation. */
+export const MIN_TOKENS_TO_GENERATE = 100;
 
-/** One-time credit packs available for purchase. */
-export interface CreditPack {
+/** Balance below which the "running low" warning is shown. */
+export const LOW_TOKEN_THRESHOLD = 10_000;
+
+/** @deprecated kept for any remaining references during migration */
+export const FREE_SIGNUP_CREDITS = FREE_SIGNUP_TOKENS;
+
+export interface TokenPack {
   id: string;
   name: string;
-  credits: number;
+  tokens: number;
   price: number; // INR
   badge?: string;
-  perCredit: string; // display string
+  perKTokens: string;
 }
 
-export const CREDIT_PACKS: CreditPack[] = [
+export const TOKEN_PACKS: TokenPack[] = [
   {
-    id: "pack_500",
+    id: "pack_100k",
     name: "Starter Pack",
-    credits: 500,
-    price: 249,
-    perCredit: "₹0.50/credit",
+    tokens: 100_000,
+    price: 99,
+    perKTokens: "₹0.99 / 1K tokens",
   },
   {
-    id: "pack_2000",
+    id: "pack_500k",
     name: "Pro Pack",
-    credits: 2000,
-    price: 799,
+    tokens: 500_000,
+    price: 399,
     badge: "Best Value",
-    perCredit: "₹0.40/credit",
+    perKTokens: "₹0.80 / 1K tokens",
   },
   {
-    id: "pack_5000",
+    id: "pack_2m",
     name: "Power Pack",
-    credits: 5000,
-    price: 1799,
-    perCredit: "₹0.36/credit",
+    tokens: 2_000_000,
+    price: 1299,
+    perKTokens: "₹0.65 / 1K tokens",
   },
 ];
 
-/** Free credits awarded to new users on signup. */
-export const FREE_SIGNUP_CREDITS = 50;
+/** @deprecated Use TOKEN_PACKS */
+export const CREDIT_PACKS = TOKEN_PACKS;
+
+/** @deprecated flat-rate cost no longer used; tokens are charged by actual usage */
+export function getGenerationCost(_modelId: string): number { return 0; }
+export const GENERATION_COST = { free_model: 0, paid_model: 0 };

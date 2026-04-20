@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { getActiveApiKey } from "@/lib/openrouter-keys";
 import { logModelUsage } from "@/lib/model-usage";
 import { openRouterErrorResponse } from "@/lib/openrouter-error";
-import { enforceCredits } from "@/lib/enforce-credits";
+import { enforceTokens, deductTokens, interceptTokenUsage } from "@/lib/tokens";
 
 export const runtime = "nodejs";
 
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     memories?: string[];
   };
 
-  const credit = await enforceCredits(req, model, `planner:${model}`);
+  const credit = await enforceTokens(req, "planner");
   if (credit.error) return credit.error;
 
   let system = `You are a productive personal assistant and task coach. You help people analyze their task list, identify bottlenecks, suggest prioritization strategies, and keep them on track.
@@ -41,6 +41,7 @@ Be concise, direct, and actionable. Use bullet points and numbered lists where h
     body: JSON.stringify({
       model,
       stream: true,
+      stream_options: { include_usage: true },
       messages: [
         { role: "system", content: system },
         { role: "user", content: userMsg },
@@ -52,7 +53,10 @@ Be concise, direct, and actionable. Use bullet points and numbered lists where h
 
   logModelUsage(model, "planner", credit.uid).catch(() => {});
 
-  return new Response(upstream.body, {
+  const body = interceptTokenUsage(upstream, (n) =>
+    deductTokens(credit.uid, n).catch((e) => console.error("[planner] token deduction:", e))
+  );
+  return new Response(body, {
     headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "X-Accel-Buffering": "no" },
   });
 }

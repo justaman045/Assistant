@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getActiveApiKey } from "@/lib/openrouter-keys";
-import { enforceCredits } from "@/lib/enforce-credits";
+import { enforceTokens, deductTokens } from "@/lib/tokens";
 import { logModelUsage } from "@/lib/model-usage";
 
 export const runtime = "nodejs";
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   const { description, model = "google/gemini-2.0-flash-001" } = await req.json() as { description: string; model?: string };
   if (!description?.trim()) return new Response("Description required", { status: 400 });
 
-  const credit = await enforceCredits(req, model, `assistant-gen:${model}`);
+  const credit = await enforceTokens(req, "assistant-gen");
   if (credit.error) return credit.error;
 
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
   const raw: string = json.choices?.[0]?.message?.content ?? "{}";
 
   logModelUsage(model, "assistant-generate", credit.uid).catch(() => {});
+  deductTokens(credit.uid, json.usage?.total_tokens ?? 0).catch((e) => console.error("[assistant-gen] token deduction:", e));
 
   try {
     const stripped = raw.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "").trim();

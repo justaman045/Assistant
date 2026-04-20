@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import crypto from "crypto";
 import { adminDb, adminAuth, FieldValue } from "@/lib/firebase-admin";
-import { CREDIT_PACKS } from "@/lib/credits";
+import { TOKEN_PACKS } from "@/lib/credits";
 
 export async function POST(req: NextRequest) {
   const db = adminDb();
@@ -40,12 +40,12 @@ export async function POST(req: NextRequest) {
     return new Response("Invalid signature", { status: 400 });
   }
 
-  const pack = CREDIT_PACKS.find((p) => p.id === packId);
+  const pack = TOKEN_PACKS.find((p) => p.id === packId);
   if (!pack) return new Response("Invalid pack", { status: 400 });
 
   await db.collection("users").doc(uid).update({
-    credits: FieldValue.increment(pack.credits),
+    tokens: FieldValue.increment(pack.tokens),
   });
 
-  return Response.json({ success: true, creditsAdded: pack.credits });
+  return Response.json({ success: true, tokensAdded: pack.tokens });
 }

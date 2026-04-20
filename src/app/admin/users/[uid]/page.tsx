@@ -24,8 +24,10 @@ interface UserProfile {
   photoURL: string;
   preferredName: string;
   role: string;
-  credits: number;
-  creditsUsed: number;
+  tokens: number;
+  tokensUsed: number;
+  credits?: number;
+  creditsUsed?: number;
   isAdmin: boolean;
   onboardingComplete: boolean;
   defaultModel: string;
@@ -145,14 +147,14 @@ export default function AdminUserDetailPage() {
         body: JSON.stringify({ amount: sign * amount, note: creditNote }),
       });
       if (!res.ok) throw new Error(await res.text());
-      const { credits } = await res.json();
+      const { tokens } = await res.json();
       setDetail((prev) =>
-        prev ? { ...prev, profile: { ...prev.profile, credits } } : prev
+        prev ? { ...prev, profile: { ...prev.profile, tokens } } : prev
       );
       setCreditAmount("");
       setCreditNote("");
       toast(
-        `${sign > 0 ? "Added" : "Removed"} ${amount} credits successfully`,
+        `${sign > 0 ? "Added" : "Removed"} ${amount.toLocaleString()} tokens successfully`,
         "success"
       );
     } catch (e) {
@@ -259,27 +261,31 @@ export default function AdminUserDetailPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        {/* Credit Management */}
+        {/* Token Management */}
         <div className="rounded-xl border border-gray-800 bg-gray-900">
           <div className="border-b border-gray-800 px-5 py-4">
-            <h2 className="text-sm font-semibold text-white">Credit Management</h2>
-            <p className="mt-0.5 text-xs text-gray-500">Add or remove credits from this user.</p>
+            <h2 className="text-sm font-semibold text-white">Token Management</h2>
+            <p className="mt-0.5 text-xs text-gray-500">Add or remove tokens from this user.</p>
           </div>
           <div className="px-5 py-4 flex flex-col gap-4">
             {/* Current balance */}
             <div className="flex items-center justify-between rounded-lg bg-gray-800/60 px-4 py-3">
               <span className="text-sm text-gray-400">Current balance</span>
-              <span className="text-xl font-bold text-white">{profile.credits.toLocaleString()}</span>
+              <span className="text-xl font-bold text-white">
+                {profile.tokens >= 1000 ? `${(profile.tokens / 1000).toFixed(1)}K` : profile.tokens.toLocaleString()}
+              </span>
             </div>
             <div className="flex items-center justify-between rounded-lg bg-gray-800/60 px-4 py-3">
               <span className="text-sm text-gray-400">Total consumed</span>
-              <span className="text-sm font-medium text-gray-300">{profile.creditsUsed.toLocaleString()}</span>
+              <span className="text-sm font-medium text-gray-300">
+                {profile.tokensUsed >= 1000 ? `${(profile.tokensUsed / 1000).toFixed(1)}K` : profile.tokensUsed.toLocaleString()}
+              </span>
             </div>
 
             {/* Adjustment form */}
             <div>
               <label className="mb-1.5 block text-xs font-medium text-gray-400">
-                Amount to add / remove
+                Tokens to add / remove
               </label>
               <input
                 type="number"

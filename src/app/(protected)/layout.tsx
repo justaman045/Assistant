@@ -69,7 +69,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">{children}</main>
+        <main className="flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-8">{children}</main>
       </div>
     </div>
   );

@@ -19,7 +19,25 @@ export const CATEGORY_LABELS: Record<RoleplayCategory, string> = {
 
 export const PARTNER_AVATARS = ["🧑", "👩", "🧔", "👩‍💼", "🤖", "🧙", "🧝", "🦸", "🧜", "👽"];
 
-export function buildSystemPrompt(partner: RoleplayPartner, memoryContext?: string): string {
+export const ROLEPLAY_LANGUAGES = [
+  { code: "auto", label: "Auto" },
+  { code: "en", label: "English" },
+  { code: "hi", label: "Hindi" },
+  { code: "es", label: "Spanish" },
+  { code: "fr", label: "French" },
+  { code: "de", label: "German" },
+  { code: "ja", label: "Japanese" },
+  { code: "zh", label: "Chinese" },
+  { code: "ar", label: "Arabic" },
+  { code: "pt", label: "Portuguese" },
+  { code: "ru", label: "Russian" },
+  { code: "ko", label: "Korean" },
+  { code: "it", label: "Italian" },
+  { code: "bn", label: "Bengali" },
+  { code: "ta", label: "Tamil" },
+];
+
+export function buildSystemPrompt(partner: RoleplayPartner, memoryContext?: string, language?: string): string {
   let base = `You are ${partner.name}.`;
   if (partner.persona) base += ` ${partner.persona}`;
   if (partner.personality) base += `\n\nPersonality traits: ${partner.personality}`;
@@ -41,6 +59,11 @@ export function buildSystemPrompt(partner: RoleplayPartner, memoryContext?: stri
 
   if (memoryContext?.trim()) {
     base += `\n\n---\nWHAT YOU KNOW ABOUT THIS USER (use to personalise your responses naturally — don't recite these facts directly):\n${memoryContext.trim()}`;
+  }
+
+  if (language && language !== "auto") {
+    const langLabel = ROLEPLAY_LANGUAGES.find((l) => l.code === language)?.label ?? language;
+    base += `\n\n---\nLANGUAGE INSTRUCTION: You MUST respond exclusively in ${langLabel}. Do not switch to any other language regardless of what language the user writes in.`;
   }
 
   return base;

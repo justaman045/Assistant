@@ -362,7 +362,7 @@ export default function AssistantChatPage() {
   const otherAssistants = allAssistants.filter((a) => a.id !== assistantId);
 
   return (
-    <div className="flex h-[calc(100vh-5rem)] overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm dark:border-gray-700/80 dark:bg-gray-900">
+    <div className="flex h-[calc(100dvh-5rem)] overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm dark:border-gray-700/80 dark:bg-gray-900 md:h-[calc(100vh-5rem)]">
       {/* ── Sidebar: chat history ─────────────────────────────────────────── */}
       {showSidebar && (
         <div className="flex w-56 shrink-0 flex-col border-r border-gray-100 dark:border-gray-800">

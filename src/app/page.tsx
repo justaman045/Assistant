@@ -56,7 +56,7 @@ const FEATURES = [
 ];
 
 const HOW_IT_WORKS = [
-  { step: "1", title: "Sign in with Google", desc: "One click. No forms, no credit card required. 50 free credits on signup." },
+  { step: "1", title: "Sign in with Google", desc: "One click. No forms, no credit card required. 50,000 free tokens on signup." },
   { step: "2", title: "Set up your memory & brand voice", desc: "Tell the AI who you are. It uses this context on every single generation." },
   { step: "3", title: "Create, plan, and analyze", desc: "Generate content, manage tasks, track finances — all in one dashboard." },
 ];
@@ -124,9 +124,9 @@ export default function Home() {
             <span className="text-base font-bold text-gray-900 dark:text-gray-100">Dashboard</span>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Theme toggle */}
-            <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50 p-0.5 dark:border-gray-700 dark:bg-gray-900">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Theme toggle — hidden on smallest screens */}
+            <div className="hidden items-center rounded-lg border border-gray-200 bg-gray-50 p-0.5 sm:flex dark:border-gray-700 dark:bg-gray-900">
               {(["light", "dark", "system"] as ThemeValue[]).map((t) => {
                 const Icon = THEME_ICONS[t];
                 return (
@@ -165,14 +165,14 @@ export default function Home() {
           <Sparkles className="h-3.5 w-3.5" />
           Your all-in-one personal AI dashboard
         </div>
-        <h1 className="mt-6 text-5xl font-extrabold leading-tight tracking-tight sm:text-6xl">
+        <h1 className="mt-6 text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
           Create content, plan your life,{" "}
           <span className="text-indigo-600 dark:text-indigo-400">powered by AI</span>
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-xl text-gray-500 dark:text-gray-400">
           Write LinkedIn posts, practice sales calls, track your finances, manage subscriptions — all from one dashboard with 30+ AI models and your personal brand voice baked in.
         </p>
-        <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+        <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
           <button
             onClick={handleSignIn}
             disabled={signingIn}
@@ -183,7 +183,7 @@ export default function Home() {
               : <><svg className="h-5 w-5" viewBox="0 0 24 24" fill="none"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg> Sign in with Google</>
             }
           </button>
-          <p className="text-sm text-gray-400 dark:text-gray-500">50 free credits · No credit card required</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500">50,000 free tokens · No credit card required</p>
         </div>
         {signInError && (
           <p className="mt-4 text-sm text-red-500">{signInError}</p>
@@ -255,13 +255,13 @@ export default function Home() {
         <div className="mx-auto max-w-2xl px-6 text-center">
           <h2 className="mb-4 text-3xl font-bold">Simple, transparent pricing</h2>
           <p className="mb-8 text-gray-500 dark:text-gray-400">
-            Start free with 50 credits. Subscribe monthly for more, or buy one-time packs — they never expire.
+            Start free with 50,000 tokens. Buy one-time token packs — they never expire.
           </p>
           <div className="grid grid-cols-1 gap-4 text-left sm:grid-cols-3">
             {[
-              { name: "Free", price: "₹0", credits: "50 credits/month", cta: "Get started", highlight: false },
-              { name: "Starter", price: "₹299/mo", credits: "500 credits/month", cta: "Start Starter", highlight: false },
-              { name: "Pro", price: "₹699/mo", credits: "1,500 credits/month", cta: "Go Pro", highlight: true },
+              { name: "Starter", price: "₹99", credits: "100K tokens", cta: "Get started", highlight: false },
+              { name: "Value", price: "₹399", credits: "500K tokens", cta: "Best Value", highlight: true },
+              { name: "Power", price: "₹1,299", credits: "2M tokens", cta: "Go Power", highlight: false },
             ].map(({ name, price, credits, cta, highlight }) => (
               <div
                 key={name}
@@ -289,8 +289,8 @@ export default function Home() {
             ))}
           </div>
           <div className="mt-6 space-y-1 text-sm text-gray-400 dark:text-gray-500">
-            <p>Business plan at ₹1,499/mo for 5,000 credits/month also available.</p>
-            <p>Or buy one-time credit packs — they never expire.</p>
+            <p>Tokens are deducted based on actual AI usage — no flat-rate charges.</p>
+            <p>Start with 50,000 free tokens — no card required.</p>
           </div>
         </div>
       </section>
@@ -299,7 +299,7 @@ export default function Home() {
       <section className="bg-gray-50 py-16 dark:bg-gray-900">
         <div className="mx-auto max-w-3xl px-6 text-center">
           <h2 className="mb-8 text-2xl font-bold">Every plan includes</h2>
-          <div className="grid grid-cols-2 gap-3 text-left sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2.5 text-left sm:grid-cols-2 lg:grid-cols-3">
             {[
               "All 30+ AI models",
               "Content Studio (18 templates)",
@@ -340,7 +340,7 @@ export default function Home() {
               : <><ArrowRight className="h-5 w-5" /> Sign in with Google — it's free</>
             }
           </button>
-          <p className="mt-3 text-sm text-indigo-300">50 credits free · No card required</p>
+          <p className="mt-3 text-sm text-indigo-300">50,000 free tokens · No card required</p>
         </div>
       </section>
 

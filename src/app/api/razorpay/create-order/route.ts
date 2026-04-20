@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
-import { CREDIT_PACKS } from "@/lib/credits";
+import { TOKEN_PACKS } from "@/lib/credits";
 
 const RZP_BASE = "https://api.razorpay.com/v1";
 
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { packId } = (await req.json()) as { packId: string };
-  const pack = CREDIT_PACKS.find((p) => p.id === packId);
+  const pack = TOKEN_PACKS.find((p) => p.id === packId);
   if (!pack) return new Response("Invalid pack", { status: 400 });
 
   try {
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
         amount: pack.price * 100, // paise
         currency: "INR",
         receipt: `${uid.slice(0, 12)}_${packId.slice(5)}_${Date.now().toString(36)}`,
-        notes: { uid, packId, credits: pack.credits },
+        notes: { uid, packId, tokens: pack.tokens },
       }),
     });
 

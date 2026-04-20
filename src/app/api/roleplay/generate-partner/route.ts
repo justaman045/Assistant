@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { getActiveApiKey } from "@/lib/openrouter-keys";
 import { logModelUsage } from "@/lib/model-usage";
 import { openRouterErrorResponse } from "@/lib/openrouter-error";
-import { enforceCredits } from "@/lib/enforce-credits";
+import { enforceTokens, deductTokens } from "@/lib/tokens";
 
 export const runtime = "nodejs";
 
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   const { description, model = "openai/gpt-4o-mini" } = await req.json() as { description: string; model?: string };
   if (!description?.trim()) return new Response("Description required", { status: 400 });
 
-  const credit = await enforceCredits(req, model, `roleplay-gen:${model}`);
+  const credit = await enforceTokens(req, "roleplay-gen");
   if (credit.error) return credit.error;
 
   const systemPrompt = `You are a creative AI partner designer. Based on the user's description, generate a detailed roleplay partner profile.
@@ -47,10 +47,11 @@ Return ONLY valid JSON (no markdown, no code blocks) in this exact structure:
 
   if (!res.ok) return openRouterErrorResponse(res);
 
-  logModelUsage(model, "roleplay-generate").catch(() => {});
+  logModelUsage(model, "roleplay-generate", credit.uid).catch(() => {});
 
-  const data = await res.json() as { choices: { message: { content: string } }[] };
+  const data = await res.json() as { choices: { message: { content: string } }[]; usage?: { total_tokens: number } };
   const raw = data.choices[0]?.message?.content ?? "{}";
+  deductTokens(credit.uid, data.usage?.total_tokens ?? 0).catch((e) => console.error("[roleplay-gen] token deduction:", e));
 
   try {
     const parsed = JSON.parse(raw);

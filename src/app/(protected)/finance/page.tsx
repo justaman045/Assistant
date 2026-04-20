@@ -160,7 +160,7 @@ export default function FinancePage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-3">
         <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700">
           <div className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-green-500" />

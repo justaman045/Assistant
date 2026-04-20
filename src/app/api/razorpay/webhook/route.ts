@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import crypto from "crypto";
 import { adminDb, FieldValue } from "@/lib/firebase-admin";
-import { CREDIT_PACKS } from "@/lib/credits";
+import { TOKEN_PACKS } from "@/lib/credits";
 import { getPlan } from "@/lib/plans";
 
 function verifyWebhookSignature(body: string, signature: string, secret: string): boolean {
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     const packId = payment.notes?.packId;
     if (!uid || !packId) return new Response("OK", { status: 200 });
 
-    const pack = CREDIT_PACKS.find((p) => p.id === packId);
+    const pack = TOKEN_PACKS.find((p) => p.id === packId);
     if (!pack) return new Response("OK", { status: 200 });
 
     // Idempotency: store payment ID to avoid double-crediting
@@ -66,11 +66,11 @@ export async function POST(req: NextRequest) {
 
     await db.runTransaction(async (tx) => {
       tx.set(paymentRef, {
-        uid, packId, credits: pack.credits,
+        uid, packId, tokens: pack.tokens,
         status: "captured", createdAt: new Date(),
       });
       tx.update(db.collection("users").doc(uid), {
-        credits: FieldValue.increment(pack.credits),
+        tokens: FieldValue.increment(pack.tokens),
       });
     });
   }
