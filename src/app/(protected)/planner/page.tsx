@@ -228,7 +228,7 @@ export default function PlannerPage() {
           <div className="grid grid-cols-3 gap-3">
             {STATUSES.map((s) => (
               <button key={s} onClick={() => setFilterStatus(filterStatus === s ? "all" : s)}
-                className={`rounded-xl p-3 text-center transition-all ${filterStatus === s ? "bg-indigo-600 text-white shadow-sm" : "bg-white text-gray-900 shadow-sm ring-1 ring-gray-200/80 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-700/80"}`}>
+                className={`rounded-xl p-3 text-center transition-all ${filterStatus === s ? "bg-indigo-600 text-white shadow-sm" : "bg-white text-gray-900 shadow-sm ring-1 ring-gray-200/80 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-100 dark:ring-gray-700/80 dark:hover:bg-gray-800"}`}>
                 <p className="text-2xl font-bold">{counts[s]}</p>
                 <p className="mt-0.5 text-xs">{STATUS_LABELS[s]}</p>
               </button>
@@ -240,7 +240,7 @@ export default function PlannerPage() {
             <span className="self-center text-xs text-gray-400">Priority:</span>
             {(["all", ...PRIORITIES] as const).map((p) => (
               <button key={p} onClick={() => setFilterPriority(p as TaskPriority | "all")}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${filterPriority === p ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400"}`}>
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${filterPriority === p ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"}`}>
                 {p === "all" ? "All priorities" : PRIORITY_LABELS[p as TaskPriority]}
               </button>
             ))}

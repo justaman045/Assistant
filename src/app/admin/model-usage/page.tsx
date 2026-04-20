@@ -2,24 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { BarChart2, Zap, TrendingUp, RefreshCw, Loader2 } from "lucide-react";
+import { BarChart2, Zap, TrendingUp, RefreshCw, Loader2, Layers } from "lucide-react";
 
-interface DailyStats {
-  date: string;
-  free: number;
-  paid: number;
-  total: number;
-}
-
-interface ModelStats {
-  model: string;
-  tier: "free" | "paid";
-  count: number;
-}
-
+interface DailyStats { date: string; free: number; paid: number; total: number; }
+interface ModelStats { model: string; tier: "free" | "paid"; count: number; }
+interface FeatureStats { feature: string; count: number; }
 interface UsageSummary {
   daily: DailyStats[];
   byModel: ModelStats[];
+  byFeature: FeatureStats[];
   totalFree: number;
   totalPaid: number;
   totalRequests: number;
@@ -27,22 +18,23 @@ interface UsageSummary {
 
 const DAY_OPTIONS = [7, 14, 30, 90];
 
+const FEATURE_LABELS: Record<string, string> = {
+  content: "Content",
+  roleplay: "Roleplay",
+  "roleplay-generate": "Roleplay Gen",
+  planner: "Planner",
+  finance: "Finance",
+  subscriptions: "Subscriptions",
+  assistant: "Assistant Chat",
+  "assistant-generate": "Assistant Gen",
+  memory: "Memory",
+  prompts: "Prompts",
+  unknown: "Unknown",
+};
+
 function formatDate(dateStr: string) {
   const [y, m, d] = dateStr.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-function Bar({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = max > 0 ? Math.max(2, (value / max) * 100) : 0;
-  return (
-    <div className="flex h-full w-full items-end">
-      <div
-        className={`w-full rounded-t transition-all ${color}`}
-        style={{ height: `${pct}%` }}
-        title={String(value)}
-      />
-    </div>
-  );
 }
 
 export default function ModelUsagePage() {
@@ -69,7 +61,7 @@ export default function ModelUsagePage() {
     }
   }
 
-  useEffect(() => { if (user) load(); }, [user]);
+  useEffect(() => { if (user) load(); }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleDaysChange(d: number) {
     setDays(d);
@@ -84,7 +76,7 @@ export default function ModelUsagePage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Model Usage</h1>
           <p className="mt-1 text-sm text-gray-400">
-            AI request analytics — free vs paid models, per-model breakdown.
+            AI request analytics — free vs paid models, per-model and per-feature breakdown.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -170,7 +162,6 @@ export default function ModelUsagePage() {
                   {data?.daily.map((d) => (
                     <div key={d.date} className="flex flex-1 flex-col items-center gap-1">
                       <div className="relative w-full flex-1 flex items-end gap-0.5">
-                        {/* Paid bar */}
                         <div className="flex-1 h-full flex items-end">
                           <div
                             className="w-full rounded-t bg-amber-500/70 transition-all"
@@ -178,7 +169,6 @@ export default function ModelUsagePage() {
                             title={`Paid: ${d.paid}`}
                           />
                         </div>
-                        {/* Free bar */}
                         <div className="flex-1 h-full flex items-end">
                           <div
                             className="w-full rounded-t bg-green-500/70 transition-all"
@@ -190,7 +180,6 @@ export default function ModelUsagePage() {
                     </div>
                   ))}
                 </div>
-                {/* X-axis labels — show every N days to avoid crowding */}
                 <div className="mt-2 flex gap-1">
                   {data?.daily.map((d, i) => {
                     const step = data.daily.length > 14 ? Math.ceil(data.daily.length / 7) : 1;
@@ -217,58 +206,87 @@ export default function ModelUsagePage() {
             )}
           </div>
 
-          {/* Per-model table */}
-          <div className="rounded-xl border border-gray-800 bg-gray-900">
-            <div className="border-b border-gray-800 px-6 py-4">
-              <h2 className="text-sm font-semibold text-white">Requests by Model</h2>
-            </div>
-            {data?.byModel.length === 0 ? (
-              <p className="py-8 text-center text-sm text-gray-500">No model usage data yet.</p>
-            ) : (
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-800 text-left">
-                    <th className="px-6 py-3 text-xs font-medium text-gray-500">Model</th>
-                    <th className="px-6 py-3 text-xs font-medium text-gray-500">Tier</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500">Requests</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500">Share</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-800">
-                  {data?.byModel.map((m) => {
-                    const share = data.totalRequests > 0
-                      ? Math.round((m.count / data.totalRequests) * 100)
-                      : 0;
+          {/* Feature breakdown + per-model table side by side */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Feature breakdown */}
+            <div className="rounded-xl border border-gray-800 bg-gray-900">
+              <div className="flex items-center gap-2 border-b border-gray-800 px-6 py-4">
+                <Layers className="h-4 w-4 text-gray-400" />
+                <h2 className="text-sm font-semibold text-white">Requests by Feature</h2>
+              </div>
+              {!data?.byFeature?.length ? (
+                <p className="py-8 text-center text-sm text-gray-500">No feature data yet.</p>
+              ) : (
+                <div className="divide-y divide-gray-800">
+                  {data.byFeature.map((f) => {
+                    const share = data.totalRequests > 0 ? Math.round((f.count / data.totalRequests) * 100) : 0;
                     return (
-                      <tr key={m.model} className="hover:bg-gray-800/40 transition-colors">
-                        <td className="px-6 py-3 font-mono text-xs text-gray-300">{m.model}</td>
-                        <td className="px-6 py-3">
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                            m.tier === "free"
-                              ? "bg-green-900/50 text-green-400"
-                              : "bg-amber-900/50 text-amber-400"
-                          }`}>
-                            {m.tier}
-                          </span>
-                        </td>
-                        <td className="px-6 py-3 text-right text-sm text-white">{m.count.toLocaleString()}</td>
-                        <td className="px-6 py-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <div className="h-1.5 w-16 rounded-full bg-gray-800">
-                              <div
-                                className="h-full rounded-full bg-violet-500"
-                                style={{ width: `${share}%` }}
-                              />
-                            </div>
-                            <span className="text-xs text-gray-500 w-8 text-right">{share}%</span>
+                      <div key={f.feature} className="flex items-center justify-between px-6 py-3">
+                        <span className="text-sm text-gray-300">
+                          {FEATURE_LABELS[f.feature] ?? f.feature}
+                        </span>
+                        <div className="flex items-center gap-3">
+                          <div className="h-1.5 w-20 rounded-full bg-gray-800">
+                            <div
+                              className="h-full rounded-full bg-violet-500"
+                              style={{ width: `${share}%` }}
+                            />
                           </div>
-                        </td>
-                      </tr>
+                          <span className="w-8 text-right text-xs text-gray-500">{share}%</span>
+                          <span className="w-10 text-right text-sm font-medium text-white">
+                            {f.count.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
-            )}
+                </div>
+              )}
+            </div>
+
+            {/* Per-model table */}
+            <div className="rounded-xl border border-gray-800 bg-gray-900">
+              <div className="border-b border-gray-800 px-6 py-4">
+                <h2 className="text-sm font-semibold text-white">Requests by Model</h2>
+              </div>
+              {data?.byModel.length === 0 ? (
+                <p className="py-8 text-center text-sm text-gray-500">No model usage data yet.</p>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-800 text-left">
+                      <th className="px-6 py-3 text-xs font-medium text-gray-500">Model</th>
+                      <th className="px-6 py-3 text-xs font-medium text-gray-500">Tier</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500">Reqs</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500">%</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-800">
+                    {data?.byModel.map((m) => {
+                      const share = data.totalRequests > 0
+                        ? Math.round((m.count / data.totalRequests) * 100)
+                        : 0;
+                      return (
+                        <tr key={m.model} className="hover:bg-gray-800/40 transition-colors">
+                          <td className="px-6 py-3 font-mono text-xs text-gray-300 max-w-[180px] truncate">{m.model}</td>
+                          <td className="px-6 py-3">
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                              m.tier === "free"
+                                ? "bg-green-900/50 text-green-400"
+                                : "bg-amber-900/50 text-amber-400"
+                            }`}>
+                              {m.tier}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3 text-right text-sm text-white">{m.count.toLocaleString()}</td>
+                          <td className="px-6 py-3 text-right text-xs text-gray-500">{share}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         </>
       )}

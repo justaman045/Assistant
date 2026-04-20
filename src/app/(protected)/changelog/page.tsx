@@ -1,52 +1,16 @@
 import { Sparkles, Wrench, Zap, Shield } from "lucide-react";
+import RELEASES from "@/data/changelog.json";
 
-const RELEASES = [
-  {
-    version: "1.5.0",
-    date: "April 2026",
-    highlights: ["Brand Voice — inject your tone into every generation", "Referral program — earn credits for inviting friends", "Content Calendar — visualize saved items by date", "Export content as Markdown or plain text"],
-    type: "feature" as const,
-  },
-  {
-    version: "1.4.0",
-    date: "March 2026",
-    highlights: ["Admin dashboard with user management", "Credit adjustment tools for admins", "Platform-wide stats and activity feed"],
-    type: "feature" as const,
-  },
-  {
-    version: "1.3.0",
-    date: "February 2026",
-    highlights: ["Settings page with default model preference", "18 AI content apps across 5 categories", "Coming-soon app badges with roadmap preview"],
-    type: "feature" as const,
-  },
-  {
-    version: "1.2.0",
-    date: "January 2026",
-    highlights: ["Version history for every saved item", "Restore previous versions with one click", "Change notes on edits"],
-    type: "feature" as const,
-  },
-  {
-    version: "1.1.0",
-    date: "December 2025",
-    highlights: ["Razorpay credit packs (one-time purchase)", "Low-credit warnings in sidebar", "Memory system for personalized generations"],
-    type: "feature" as const,
-  },
-  {
-    version: "1.0.0",
-    date: "November 2025",
-    highlights: ["Initial launch", "AI content generation with 30+ models via OpenRouter", "Content history with search", "Prompt Workshop"],
-    type: "feature" as const,
-  },
-];
+type ReleaseType = "feature" | "fix" | "performance" | "security";
 
-const TYPE_ICON = {
+const TYPE_ICON: Record<ReleaseType, React.ComponentType<{ className?: string }>> = {
   feature: Sparkles,
   fix: Wrench,
   performance: Zap,
   security: Shield,
 };
 
-const TYPE_COLOR = {
+const TYPE_COLOR: Record<ReleaseType, string> = {
   feature: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400",
   fix: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400",
   performance: "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400",
@@ -69,12 +33,13 @@ export default function ChangelogPage() {
 
         <div className="space-y-8">
           {RELEASES.map((release, i) => {
-            const Icon = TYPE_ICON[release.type];
+            const type = release.type as ReleaseType;
+            const Icon = TYPE_ICON[type];
             return (
               <div key={release.version} className="relative flex gap-5">
                 {/* Dot */}
                 <div
-                  className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-white shadow-sm dark:border-gray-900 ${TYPE_COLOR[release.type]}`}
+                  className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-white shadow-sm dark:border-gray-900 ${TYPE_COLOR[type]}`}
                 >
                   <Icon className="h-4 w-4" />
                 </div>

@@ -171,7 +171,7 @@ export default function BillingPage() {
               Get credits automatically every month at a lower per-credit price. Switch to a subscription plan and save more.
             </p>
             <button
-              onClick={() => {/* TODO: open subscription modal */}}
+              onClick={() => document.getElementById("subscription-plans")?.scrollIntoView({ behavior: "smooth" })}
               className="mt-3 rounded-lg bg-white px-4 py-1.5 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 transition-colors"
             >
               View subscription plans →
@@ -236,7 +236,7 @@ export default function BillingPage() {
       </div>
 
       {/* Subscription plans */}
-      <div>
+      <div id="subscription-plans">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Subscription Plans</h2>
           {/* Monthly / Annual toggle */}

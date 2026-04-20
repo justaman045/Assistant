@@ -1,8 +1,46 @@
 import { NextRequest } from "next/server";
 import { adminAuth, adminDb, FieldValue } from "@/lib/firebase-admin";
 import { getActiveApiKey } from "@/lib/openrouter-keys";
+import { enforceCredits } from "@/lib/enforce-credits";
+import { logModelUsage } from "@/lib/model-usage";
 
 export const runtime = "nodejs";
+
+// ── Semantic similarity for memory deduplication ──────────────────────────────
+
+const STOP_WORDS = new Set([
+  "i","me","my","we","you","he","she","it","they","a","an","the","is","are","was","were",
+  "be","been","being","have","has","had","do","does","did","will","would","could","should",
+  "may","might","shall","can","to","of","in","on","at","for","with","about","as","and",
+  "or","but","not","no","so","if","this","that","these","those","then","than","also",
+  "just","only","very","more","most","some","any","all","both","each","few","many",
+]);
+
+function tokenize(text: string): Set<string> {
+  return new Set(
+    text.toLowerCase()
+      .replace(/[^\w\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 1 && !STOP_WORDS.has(w))
+  );
+}
+
+function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 && b.size === 0) return 1;
+  const intersection = [...a].filter((w) => b.has(w)).length;
+  const union = new Set([...a, ...b]).size;
+  return union === 0 ? 0 : intersection / union;
+}
+
+function semanticallySimilar(a: string, b: string, threshold = 0.45): boolean {
+  const ta = tokenize(a);
+  const tb = tokenize(b);
+  // Also check if all key words from the shorter one appear in the longer one
+  const shorter = ta.size <= tb.size ? ta : tb;
+  const longer = ta.size <= tb.size ? tb : ta;
+  const containment = shorter.size === 0 ? 0 : [...shorter].filter((w) => longer.has(w)).length / shorter.size;
+  return jaccardSimilarity(ta, tb) >= threshold || containment >= 0.7;
+}
 
 // ── Tool schemas (sent to LLM) ────────────────────────────────────────────────
 // To add support for a new feature: append a new entry here + a case in executeTool().
@@ -352,6 +390,20 @@ async function executeTool(
 
       case "save_memory": {
         const { content, category } = args as { content: string; category: string };
+
+        // Server-side semantic dedup — fetch existing memories and check similarity
+        const existingSnap = await db.collection("users").doc(uid).collection("memories").get();
+        const existing = existingSnap.docs.map((d) => d.data().content as string);
+        const duplicate = existing.find((e) => semanticallySimilar(content, e));
+
+        if (duplicate) {
+          return {
+            label: `Already in memory (skipped duplicate)`,
+            result: `Already stored: "${duplicate.slice(0, 80)}"`,
+            success: true,
+          };
+        }
+
         await db.collection("users").doc(uid).collection("memories").add({
           content, category, source: "manual", type: "manual",
           usageCount: 0, createdAt: FieldValue.serverTimestamp(),
@@ -380,13 +432,6 @@ async function executeTool(
 // ── Main route ────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  const auth = adminAuth();
-  if (auth) {
-    const token = req.headers.get("Authorization")?.slice(7);
-    if (!token) return new Response("Unauthorized", { status: 401 });
-    try { await auth.verifyIdToken(token); } catch { return new Response("Invalid token", { status: 401 }); }
-  }
-
   const apiKey = await getActiveApiKey();
   if (!apiKey) return new Response("OpenRouter not configured", { status: 500 });
 
@@ -397,6 +442,9 @@ export async function POST(req: NextRequest) {
     model: string;
     memories?: string[];
   };
+
+  const credit = await enforceCredits(req, model, `assistant:${uid}`);
+  if (credit.error) return credit.error;
 
   let system: string;
 
@@ -410,9 +458,32 @@ export async function POST(req: NextRequest) {
 
   system += `
 
-## Tool Rules
-- When the user asks you to do something, check if you have all required fields. If not, ask for ONLY the missing required ones in a single question — never ask for optional fields.
-- When you have everything needed, call the tool immediately without asking for confirmation.
+## Memory — CRITICAL RULES (follow these without exception)
+
+### Auto-saving (do this WITHOUT being asked)
+After reading every user message, silently ask yourself: "Does this contain any fact worth remembering for future conversations?" If YES — call save_memory BEFORE replying. Do NOT wait for the user to say "remember this". Save automatically when you detect:
+- Financial facts: savings amount, income, salary, rent, EMIs, debts, investments, financial goals (e.g. "I have ₹48,000 in savings" → save immediately)
+- Personal facts: family, relationships, city, job, age, health conditions
+- Preferences: likes, dislikes, habits, dietary choices, hobbies
+- Goals: targets the user mentions (save ₹X by date, lose weight, etc.)
+- Rules/constraints: things to never do, people to avoid, restrictions
+- Any fact that would be useful to know in a future conversation
+
+### Recall before answering personal questions
+When the user asks about themselves — savings, finances, preferences, personal facts — ALWAYS call recall_user_info FIRST before answering. Never say "I don't have that data" or return ₹0 without first checking memory. The answer may be stored there even if it's not in the app's tracked data.
+
+### Deduplication (important)
+Before calling save_memory, check the memories already shown below. If the new memory means the same thing as an existing one — even if worded differently — do NOT save. Just acknowledge you already have it ("Already noted 👍"). Only save genuinely new information.
+
+### Other rules
+- Save EVERY distinct fact as a SEPARATE save_memory call — do not batch multiple facts into one.
+- Use category "rule" for hard constraints. "personal" for life facts. "preference" for likes/dislikes. "expertise" for skills.
+- When declining something due to a stored rule, respond warmly and mention the reason naturally.
+- After saving a new memory, briefly confirm it. If already existed, say "Already noted that one 👍".
+
+## Action Rules
+- When the user asks you to do something actionable, check if you have all required fields. If not, ask ONLY for missing required ones.
+- When you have everything, call the tool immediately — no confirmation needed.
 - After completing an action, give a brief friendly confirmation (1-2 sentences max).
 - For read/list requests, format data clearly with bullet points.
 - Never make up data. If a tool returns no results, say so honestly.
@@ -422,8 +493,16 @@ export async function POST(req: NextRequest) {
   if (assistant.personality?.trim()) {
     system += `\n\n## Personality\n${assistant.personality.trim()}`;
   }
+
   if (memories?.length) {
-    system += `\n\n## About This User\n${memories.map((m) => `• ${m}`).join("\n")}`;
+    const rules = memories.filter((m) => m.startsWith("[RULE]"));
+    const rest = memories.filter((m) => !m.startsWith("[RULE]"));
+    if (rules.length) {
+      system += `\n\n## Hard Rules (MUST follow — never violate these)\n${rules.map((m) => `• ${m.replace("[RULE] ", "")}`).join("\n")}`;
+    }
+    if (rest.length) {
+      system += `\n\n## About This User\n${rest.map((m) => `• ${m}`).join("\n")}`;
+    }
   }
 
   const encoder = new TextEncoder();
@@ -481,6 +560,7 @@ export async function POST(req: NextRequest) {
             send({ type: "delta", content });
             send({ type: "done", actions });
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            logModelUsage(model, "assistant", uid).catch(() => {});
             break;
           }
 

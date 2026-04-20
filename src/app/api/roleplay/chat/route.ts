@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
 
   const db = adminDb();
   const auth = adminAuth();
+  let callerUid: string | undefined;
 
   if (db && auth) {
     const token = req.headers.get("Authorization")?.slice(7);
@@ -33,11 +34,12 @@ export async function POST(req: NextRequest) {
     let uid: string;
     try {
       uid = (await auth.verifyIdToken(token)).uid;
+      callerUid = uid;
     } catch {
       return new Response("Invalid token", { status: 401 });
     }
 
-    if (!checkRateLimit(`roleplay:${uid}`, 30, 60_000)) {
+    if (!(await checkRateLimit(`roleplay:${uid}`, 30, 60_000))) {
       return new Response("Too many requests", { status: 429 });
     }
 
@@ -78,7 +80,7 @@ export async function POST(req: NextRequest) {
 
   if (!upstream.ok) return openRouterErrorResponse(upstream);
 
-  logModelUsage(model).catch(() => {});
+  logModelUsage(model, "roleplay", callerUid).catch(() => {});
 
   return new Response(upstream.body, {
     headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "X-Accel-Buffering": "no" },

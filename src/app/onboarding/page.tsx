@@ -24,6 +24,7 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(0);
   const [preferredName, setPreferredName] = useState("");
   const [role, setRole] = useState("");
+  const [tosAccepted, setTosAccepted] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export default function OnboardingPage() {
       preferredName: preferredName.trim() || userProfile?.displayName,
       role,
       onboardingComplete: true,
+      tosAcceptedAt: new Date().toISOString(),
     });
     await logOnboardingComplete(role);
     router.replace("/dashboard");
@@ -150,7 +152,28 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
-              <div className="mt-8 flex gap-3">
+              <div className="mt-5">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={tosAccepted}
+                    onChange={(e) => setTosAccepted(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    I agree to the{" "}
+                    <a href="/terms" target="_blank" className="text-indigo-600 underline hover:text-indigo-700 dark:text-indigo-400">
+                      Terms of Service
+                    </a>{" "}
+                    and{" "}
+                    <a href="/privacy" target="_blank" className="text-indigo-600 underline hover:text-indigo-700 dark:text-indigo-400">
+                      Privacy Policy
+                    </a>
+                  </span>
+                </label>
+              </div>
+
+              <div className="mt-6 flex gap-3">
                 <button
                   onClick={() => setStep(0)}
                   className="flex-1 rounded-lg border border-gray-300 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
@@ -159,7 +182,7 @@ export default function OnboardingPage() {
                 </button>
                 <button
                   onClick={() => setStep(2)}
-                  disabled={!preferredName.trim() || !role}
+                  disabled={!preferredName.trim() || !role || !tosAccepted}
                   className="flex-1 rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
                 >
                   Continue →

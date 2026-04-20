@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import { signOutUser } from "@/lib/auth";
 import { updateUserProfile } from "@/lib/user";
 import { OpenRouterModel, DEFAULT_MODEL } from "@/lib/openrouter";
 import ModelPicker from "@/components/ModelPicker";
-import { User, Briefcase, Cpu, LogOut, Check } from "lucide-react";
+import { User, Briefcase, Cpu, LogOut, Check, Trash2, AlertTriangle, Download, Loader2 } from "lucide-react";
 
 const ROLES = [
   "Software Engineer",
@@ -46,6 +47,112 @@ function SectionCard({
         </div>
       </div>
       <div className="px-6 py-5">{children}</div>
+    </div>
+  );
+}
+
+function ExportDataButton() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport() {
+    if (!user) return;
+    setExporting(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/account/export", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `dashboard-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast("Export failed. Please try again.", "error");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={handleExport}
+      disabled={exporting}
+      className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors disabled:opacity-50 dark:hover:text-gray-100"
+    >
+      {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+      {exporting ? "Exporting…" : "Export my data"}
+    </button>
+  );
+}
+
+function DeleteAccountSection() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const router = useRouter();
+  const [confirm, setConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    if (!user) return;
+    setDeleting(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/account/delete", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to delete account");
+      router.replace("/");
+    } catch {
+      toast("Failed to delete account. Please try again.", "error");
+      setDeleting(false);
+    }
+  }
+
+  if (!confirm) {
+    return (
+      <button
+        onClick={() => setConfirm(true)}
+        className="flex items-center gap-2 text-sm font-medium text-gray-400 hover:text-red-600 transition-colors dark:hover:text-red-400"
+      >
+        <Trash2 className="h-4 w-4" />
+        Delete account
+      </button>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/30">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-red-700 dark:text-red-400">Delete your account?</p>
+          <p className="mt-1 text-xs text-red-600 dark:text-red-500">
+            This permanently deletes all your data — tasks, transactions, memories, assistants, and chats. This cannot be undone.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={() => setConfirm(false)}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {deleting ? "Deleting…" : "Yes, delete everything"}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -318,6 +425,11 @@ export default function SettingsPage() {
               </div>
             )}
 
+            {/* Export data */}
+            <div>
+              <ExportDataButton />
+            </div>
+
             {/* Sign out */}
             <div className="border-t border-gray-100 pt-4 dark:border-gray-800">
               <button
@@ -327,6 +439,11 @@ export default function SettingsPage() {
                 <LogOut className="h-4 w-4" />
                 Sign out
               </button>
+            </div>
+
+            {/* Delete account */}
+            <div className="border-t border-gray-100 pt-4 dark:border-gray-800">
+              <DeleteAccountSection />
             </div>
           </div>
         </SectionCard>

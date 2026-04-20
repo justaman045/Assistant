@@ -154,6 +154,7 @@ export default function CreatePage() {
         body: JSON.stringify({
           topic,
           model,
+          isFreeModel: models.find((m) => m.id === model)?.pricing.prompt === "0",
           contentType,
           memories: memoryStrings,
           length,
@@ -165,10 +166,13 @@ export default function CreatePage() {
 
       if (res.status === 402) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(
-          `Not enough credits. This model costs ${data.cost ?? 10} credits per generation. ` +
-          `Top up in Billing.`
-        );
+        if (data.error === "INSUFFICIENT_CREDITS") {
+          const bal = data.balance != null ? ` (you have ${data.balance})` : "";
+          throw new Error(
+            `Not enough credits${bal}. This model costs ${data.cost ?? 10} credits per generation. Top up in Billing.`
+          );
+        }
+        throw new Error(data.error ?? "Payment required");
       }
       if (res.status === 429) {
         throw new Error("Too many requests. Please wait a moment before generating again.");
@@ -248,9 +252,10 @@ export default function CreatePage() {
   async function extractAndSaveMemories(uid: string, topic: string, content: string) {
     try {
       const existingContent = memoriesRef.current.map((m) => m.content);
+      const token = await user!.getIdToken();
       const res = await fetch("/api/extract-memory", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ topic, content, existingMemories: existingContent }),
       });
       if (!res.ok) return;

@@ -1,19 +1,12 @@
 import { NextRequest } from "next/server";
-import { adminAuth } from "@/lib/firebase-admin";
 import { getActiveApiKey } from "@/lib/openrouter-keys";
 import { logModelUsage } from "@/lib/model-usage";
 import { openRouterErrorResponse } from "@/lib/openrouter-error";
+import { enforceCredits } from "@/lib/enforce-credits";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
-  const auth = adminAuth();
-  if (auth) {
-    const token = req.headers.get("Authorization")?.slice(7);
-    if (!token) return new Response("Unauthorized", { status: 401 });
-    try { await auth.verifyIdToken(token); } catch { return new Response("Invalid token", { status: 401 }); }
-  }
-
   const apiKey = await getActiveApiKey();
   if (!apiKey) return new Response("OpenRouter not configured", { status: 500 });
 
@@ -23,6 +16,9 @@ export async function POST(req: NextRequest) {
     model: string;
     memories?: string[];
   };
+
+  const credit = await enforceCredits(req, model, `planner:${model}`);
+  if (credit.error) return credit.error;
 
   let system = `You are a productive personal assistant and task coach. You help people analyze their task list, identify bottlenecks, suggest prioritization strategies, and keep them on track.
 
@@ -54,7 +50,7 @@ Be concise, direct, and actionable. Use bullet points and numbered lists where h
 
   if (!upstream.ok) return openRouterErrorResponse(upstream);
 
-  logModelUsage(model).catch(() => {});
+  logModelUsage(model, "planner", credit.uid).catch(() => {});
 
   return new Response(upstream.body, {
     headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "X-Accel-Buffering": "no" },

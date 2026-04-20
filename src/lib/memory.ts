@@ -98,7 +98,12 @@ export async function fetchMemories(uid: string, max = 50): Promise<Memory[]> {
     limit(max)
   );
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Memory, "id">) }));
+  const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Memory, "id">) }));
+  // Rules and manual notes always come first so they're never cut off by the limit
+  return [
+    ...all.filter((m) => m.category === "rule" || m.type === "manual"),
+    ...all.filter((m) => m.category !== "rule" && m.type !== "manual"),
+  ];
 }
 
 export async function saveMemories(

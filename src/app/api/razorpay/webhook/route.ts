@@ -30,6 +30,9 @@ export async function POST(req: NextRequest) {
         entity: {
           id: string;
           order_id: string;
+          amount: number;
+          status: string;
+          error_description?: string;
           notes?: { uid?: string; packId?: string; credits?: number };
         };
       };
@@ -44,7 +47,7 @@ export async function POST(req: NextRequest) {
     };
   };
 
-  // ── One-time credit pack purchase ──────────────────────────────────────────
+  // ── One-time credit pack purchase — succeeded ──────────────────────────────
   if (event.event === "payment.captured") {
     const payment = event.payload.payment?.entity;
     if (!payment) return new Response("OK", { status: 200 });
@@ -62,11 +65,38 @@ export async function POST(req: NextRequest) {
     if (existing.exists) return new Response("OK", { status: 200 });
 
     await db.runTransaction(async (tx) => {
-      tx.set(paymentRef, { uid, packId, credits: pack.credits, createdAt: new Date() });
+      tx.set(paymentRef, {
+        uid, packId, credits: pack.credits,
+        status: "captured", createdAt: new Date(),
+      });
       tx.update(db.collection("users").doc(uid), {
         credits: FieldValue.increment(pack.credits),
       });
     });
+  }
+
+  // ── One-time credit pack purchase — failed ────────────────────────────────
+  if (event.event === "payment.failed") {
+    const payment = event.payload.payment?.entity;
+    if (!payment) return new Response("OK", { status: 200 });
+
+    const uid = payment.notes?.uid;
+    const packId = payment.notes?.packId;
+
+    // Log the failure for support (idempotent — just record, don't double-log)
+    if (uid && packId) {
+      const failRef = db.collection("payments").doc(payment.id);
+      const existing = await failRef.get();
+      if (!existing.exists) {
+        await failRef.set({
+          uid, packId,
+          status: "failed",
+          reason: payment.error_description ?? "unknown",
+          amount: payment.amount,
+          createdAt: new Date(),
+        });
+      }
+    }
   }
 
   // ── Subscription charged (monthly/annual renewal) ─────────────────────────
@@ -90,18 +120,55 @@ export async function POST(req: NextRequest) {
       plan: planId,
       planExpiresAt: expiresAt,
       credits: plan.credits,
+      subscriptionStatus: "active",
     });
   }
 
-  // ── Subscription cancelled or failed ──────────────────────────────────────
-  if (event.event === "subscription.cancelled" || event.event === "subscription.halted") {
+  // ── Subscription payment failed (Razorpay will retry) ────────────────────
+  // Fired on first failure. Do NOT downgrade yet — Razorpay retries.
+  // Log it so support can reach out proactively.
+  if (event.event === "subscription.payment_failed") {
     const sub = event.payload.subscription?.entity;
     if (!sub) return new Response("OK", { status: 200 });
 
     const uid = sub.notes?.uid;
     if (!uid) return new Response("OK", { status: 200 });
 
-    await db.collection("users").doc(uid).update({ plan: "free", planExpiresAt: null });
+    await db.collection("users").doc(uid).update({
+      subscriptionStatus: "payment_failed",
+      paymentFailedAt: new Date(),
+    }).catch(() => {}); // non-critical — don't fail the webhook
+  }
+
+  // ── Subscription halted (all retries exhausted) ───────────────────────────
+  // Fired after Razorpay gives up retrying. Downgrade to free now.
+  if (event.event === "subscription.halted") {
+    const sub = event.payload.subscription?.entity;
+    if (!sub) return new Response("OK", { status: 200 });
+
+    const uid = sub.notes?.uid;
+    if (!uid) return new Response("OK", { status: 200 });
+
+    await db.collection("users").doc(uid).update({
+      plan: "free",
+      planExpiresAt: null,
+      subscriptionStatus: "halted",
+    });
+  }
+
+  // ── Subscription cancelled (user or merchant action) ─────────────────────
+  if (event.event === "subscription.cancelled") {
+    const sub = event.payload.subscription?.entity;
+    if (!sub) return new Response("OK", { status: 200 });
+
+    const uid = sub.notes?.uid;
+    if (!uid) return new Response("OK", { status: 200 });
+
+    await db.collection("users").doc(uid).update({
+      plan: "free",
+      planExpiresAt: null,
+      subscriptionStatus: "cancelled",
+    });
   }
 
   return new Response("OK", { status: 200 });

@@ -2,13 +2,29 @@ import { adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 
 export type ModelTier = "free" | "paid";
+export type UsageFeature =
+  | "content"
+  | "roleplay"
+  | "roleplay-generate"
+  | "planner"
+  | "finance"
+  | "subscriptions"
+  | "assistant"
+  | "assistant-generate"
+  | "memory"
+  | "prompts"
+  | "unknown";
 
 export function getModelTier(modelId: string): ModelTier {
   return modelId.includes(":free") ? "free" : "paid";
 }
 
 /** Log a single model usage event. Fire-and-forget — never throw. */
-export async function logModelUsage(model: string, uid?: string): Promise<void> {
+export async function logModelUsage(
+  model: string,
+  feature: UsageFeature = "unknown",
+  uid?: string
+): Promise<void> {
   const db = adminDb();
   if (!db) return;
 
@@ -19,6 +35,7 @@ export async function logModelUsage(model: string, uid?: string): Promise<void> 
     await db.collection("modelUsageLogs").add({
       model,
       tier,
+      feature,
       date,
       uid: uid ?? null,
       createdAt: FieldValue.serverTimestamp(),
@@ -41,9 +58,15 @@ export interface ModelStats {
   count: number;
 }
 
+export interface FeatureStats {
+  feature: UsageFeature;
+  count: number;
+}
+
 export interface UsageSummary {
-  daily: DailyStats[];       // last N days, sorted ascending
-  byModel: ModelStats[];     // all-time per model, sorted by count desc
+  daily: DailyStats[];
+  byModel: ModelStats[];
+  byFeature: FeatureStats[];
   totalFree: number;
   totalPaid: number;
   totalRequests: number;
@@ -52,7 +75,7 @@ export interface UsageSummary {
 /** Aggregate usage logs for admin dashboard. Fetches last `days` days. */
 export async function getUsageSummary(days = 30): Promise<UsageSummary> {
   const db = adminDb();
-  if (!db) return { daily: [], byModel: [], totalFree: 0, totalPaid: 0, totalRequests: 0 };
+  if (!db) return { daily: [], byModel: [], byFeature: [], totalFree: 0, totalPaid: 0, totalRequests: 0 };
 
   const since = new Date();
   since.setDate(since.getDate() - days);
@@ -66,19 +89,26 @@ export async function getUsageSummary(days = 30): Promise<UsageSummary> {
 
   const dailyMap = new Map<string, { free: number; paid: number }>();
   const modelMap = new Map<string, { tier: ModelTier; count: number }>();
+  const featureMap = new Map<string, number>();
 
   for (const doc of snap.docs) {
-    const { model, tier, date } = doc.data() as { model: string; tier: ModelTier; date: string };
+    const { model, tier, date, feature } = doc.data() as {
+      model: string;
+      tier: ModelTier;
+      date: string;
+      feature?: UsageFeature;
+    };
 
-    // Daily aggregation
     const day = dailyMap.get(date) ?? { free: 0, paid: 0 };
     if (tier === "free") day.free++; else day.paid++;
     dailyMap.set(date, day);
 
-    // Per-model aggregation
     const m = modelMap.get(model) ?? { tier, count: 0 };
     m.count++;
     modelMap.set(model, m);
+
+    const f = feature ?? "unknown";
+    featureMap.set(f, (featureMap.get(f) ?? 0) + 1);
   }
 
   const daily: DailyStats[] = Array.from(dailyMap.entries())
@@ -89,8 +119,12 @@ export async function getUsageSummary(days = 30): Promise<UsageSummary> {
     .map(([model, { tier, count }]) => ({ model, tier, count }))
     .sort((a, b) => b.count - a.count);
 
+  const byFeature: FeatureStats[] = Array.from(featureMap.entries())
+    .map(([feature, count]) => ({ feature: feature as UsageFeature, count }))
+    .sort((a, b) => b.count - a.count);
+
   const totalFree = daily.reduce((s, d) => s + d.free, 0);
   const totalPaid = daily.reduce((s, d) => s + d.paid, 0);
 
-  return { daily, byModel, totalFree, totalPaid, totalRequests: totalFree + totalPaid };
+  return { daily, byModel, byFeature, totalFree, totalPaid, totalRequests: totalFree + totalPaid };
 }

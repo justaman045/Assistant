@@ -105,7 +105,7 @@ Generate 5 optimized prompts, one per angle (${ANGLES.join(", ")}).`;
       return new Response("Failed to parse model response", { status: 500 });
     }
 
-    logModelUsage(EXPAND_MODEL).catch(() => {});
+    logModelUsage(EXPAND_MODEL, "prompts").catch(() => {});
     return Response.json(prompts);
   } catch {
     return new Response("Failed to expand prompts", { status: 500 });

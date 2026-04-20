@@ -1,24 +1,20 @@
 import { NextRequest } from "next/server";
-import { adminAuth } from "@/lib/firebase-admin";
 import { getActiveApiKey } from "@/lib/openrouter-keys";
 import { logModelUsage } from "@/lib/model-usage";
 import { openRouterErrorResponse } from "@/lib/openrouter-error";
+import { enforceCredits } from "@/lib/enforce-credits";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
-  const auth = adminAuth();
-  if (auth) {
-    const token = req.headers.get("Authorization")?.slice(7);
-    if (!token) return new Response("Unauthorized", { status: 401 });
-    try { await auth.verifyIdToken(token); } catch { return new Response("Invalid token", { status: 401 }); }
-  }
-
   const apiKey = await getActiveApiKey();
   if (!apiKey) return new Response("OpenRouter not configured", { status: 500 });
 
   const { description, model = "openai/gpt-4o-mini" } = await req.json() as { description: string; model?: string };
   if (!description?.trim()) return new Response("Description required", { status: 400 });
+
+  const credit = await enforceCredits(req, model, `roleplay-gen:${model}`);
+  if (credit.error) return credit.error;
 
   const systemPrompt = `You are a creative AI partner designer. Based on the user's description, generate a detailed roleplay partner profile.
 
@@ -51,7 +47,7 @@ Return ONLY valid JSON (no markdown, no code blocks) in this exact structure:
 
   if (!res.ok) return openRouterErrorResponse(res);
 
-  logModelUsage(model).catch(() => {});
+  logModelUsage(model, "roleplay-generate").catch(() => {});
 
   const data = await res.json() as { choices: { message: { content: string } }[] };
   const raw = data.choices[0]?.message?.content ?? "{}";

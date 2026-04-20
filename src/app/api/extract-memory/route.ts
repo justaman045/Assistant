@@ -1,6 +1,8 @@
+import { NextRequest } from "next/server";
 import { MemoryCategory } from "@/lib/memory";
 import { getActiveApiKey } from "@/lib/openrouter-keys";
 import { logModelUsage } from "@/lib/model-usage";
+import { enforceAuth } from "@/lib/enforce-credits";
 
 export const runtime = "nodejs";
 
@@ -11,9 +13,12 @@ interface ExtractedMemory {
   category: MemoryCategory;
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   const apiKey = await getActiveApiKey();
   if (!apiKey) return new Response("API key not configured", { status: 500 });
+
+  const auth = await enforceAuth(req);
+  if (auth.error) return auth.error;
 
   const { topic, content, existingMemories } = (await req.json()) as {
     topic: string;
@@ -89,7 +94,6 @@ Extract 0–3 new facts as a JSON array:
     const json = await res.json();
     const raw = json.choices?.[0]?.message?.content ?? "[]";
 
-    // Strip markdown code fences if the model wraps the JSON
     const cleaned = raw.replace(/```(?:json)?/g, "").replace(/```/g, "").trim();
 
     let extracted: ExtractedMemory[] = [];
@@ -107,7 +111,7 @@ Extract 0–3 new facts as a JSON array:
       // Model returned malformed JSON — treat as empty
     }
 
-    logModelUsage(EXTRACTION_MODEL).catch(() => {});
+    logModelUsage(EXTRACTION_MODEL, "memory", auth.uid).catch(() => {});
     return Response.json(extracted);
   } catch {
     return new Response("Failed to extract memories", { status: 500 });

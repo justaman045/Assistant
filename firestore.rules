@@ -128,6 +128,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── Rate limit counters — Admin SDK only, no client access ───────────────
+    match /rateLimits/{docId} {
+      allow read, write: if false;
+    }
+
     // ── Deny everything else ──────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;

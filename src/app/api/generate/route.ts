@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { LengthTarget } from "@/lib/types";
 import { getSystemPrompt } from "@/lib/openrouter";
 import { adminDb, adminAuth, FieldValue } from "@/lib/firebase-admin";
-import { getGenerationCost } from "@/lib/credits";
+import { getGenerationCost, GENERATION_COST } from "@/lib/credits";
 import { checkRateLimit } from "@/lib/ratelimit";
 import { getActiveApiKey } from "@/lib/openrouter-keys";
 import { logModelUsage } from "@/lib/model-usage";
@@ -14,9 +14,10 @@ import { openRouterErrorResponse } from "@/lib/openrouter-error";
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
-  const { topic, model, contentType, memories, length, tone, brandVoice } = (await req.json()) as {
+  const { topic, model, isFreeModel, contentType, memories, length, tone, brandVoice } = (await req.json()) as {
     topic: string;
     model: string;
+    isFreeModel?: boolean;
     contentType: string;
     memories?: string[];
     length?: LengthTarget;
@@ -32,6 +33,9 @@ export async function POST(req: NextRequest) {
   if (!apiKey) {
     return new Response("OpenRouter API key not configured", { status: 500 });
   }
+
+  // Brand voice may be stripped for free-plan users inside the auth block below
+  let effectiveBrandVoice = brandVoice;
 
   // ── Credit check (skipped in dev if FIREBASE_SERVICE_ACCOUNT is not set) ──
   const db = adminDb();
@@ -54,25 +58,24 @@ export async function POST(req: NextRequest) {
     }
 
     // 20 generations per minute per user
-    if (!checkRateLimit(`gen:${uid}`, 20, 60_000)) {
+    if (!(await checkRateLimit(`gen:${uid}`, 20, 60_000))) {
       return new Response(
         JSON.stringify({ error: "RATE_LIMITED", message: "Too many requests. Please wait a moment." }),
         { status: 429, headers: { "Content-Type": "application/json", "Retry-After": "60" } }
       );
     }
 
-    const cost = getGenerationCost(model);
+    // Use isFreeModel from client (based on OpenRouter pricing=$0) as it's more accurate than
+    // checking for `:free` suffix, which not all free-priced models include in their ID.
+    const cost = isFreeModel ? GENERATION_COST.free_model : getGenerationCost(model);
+    console.log("[generate] uid=%s model=%s isFreeModel=%s cost=%d", uid, model, isFreeModel, cost);
 
-    // Brand voice is a paid feature (Starter+)
+    // Brand voice is a paid feature — silently strip it for free-plan users rather
+    // than erroring, so free users with saved brand voice data can still generate.
     if (brandVoice) {
       const userSnap = await db.collection("users").doc(uid).get();
       const plan = userSnap.data()?.plan ?? "free";
-      if (plan === "free") {
-        return new Response(
-          JSON.stringify({ error: "PLAN_REQUIRED", feature: "brandVoice", minPlan: "starter" }),
-          { status: 402, headers: { "Content-Type": "application/json" } }
-        );
-      }
+      if (plan === "free") effectiveBrandVoice = undefined;
     }
 
     try {
@@ -81,10 +84,11 @@ export async function POST(req: NextRequest) {
         const snap = await tx.get(userRef);
         const data = snap.data();
         const credits: number = data?.credits ?? 0;
+        console.log("[generate] credits=%d cost=%d sufficient=%s", credits, cost, credits >= cost);
 
         if (credits < cost) {
           const err = new Error("INSUFFICIENT_CREDITS");
-          (err as Error & { cost: number }).cost = cost;
+          Object.assign(err, { cost, balance: credits });
           throw err;
         }
 
@@ -94,10 +98,10 @@ export async function POST(req: NextRequest) {
         });
       });
     } catch (e) {
-      const err = e as Error & { cost?: number };
+      const err = e as Error & { cost?: number; balance?: number };
       if (err.message === "INSUFFICIENT_CREDITS") {
         return new Response(
-          JSON.stringify({ error: "INSUFFICIENT_CREDITS", cost: err.cost ?? cost }),
+          JSON.stringify({ error: "INSUFFICIENT_CREDITS", cost: err.cost ?? cost, balance: err.balance }),
           { status: 402, headers: { "Content-Type": "application/json" } }
         );
       }
@@ -112,8 +116,8 @@ export async function POST(req: NextRequest) {
     systemPrompt += `\n\nTone: Write in a ${tone} tone throughout.`;
   }
 
-  if (brandVoice) {
-    systemPrompt += `\n\n---\nBRAND VOICE (follow these guidelines precisely):\n${brandVoice}`;
+  if (effectiveBrandVoice) {
+    systemPrompt += `\n\n---\nBRAND VOICE (follow these guidelines precisely):\n${effectiveBrandVoice}`;
   }
 
   if (memories && memories.length > 0) {
@@ -144,7 +148,7 @@ export async function POST(req: NextRequest) {
 
   if (!upstream.ok) return openRouterErrorResponse(upstream);
 
-  logModelUsage(model).catch(() => {});
+  logModelUsage(model, "content").catch(() => {});
 
   return new Response(upstream.body, {
     headers: {

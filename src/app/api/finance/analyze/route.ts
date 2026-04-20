@@ -1,21 +1,14 @@
 import { NextRequest } from "next/server";
-import { adminAuth } from "@/lib/firebase-admin";
 import { getActiveApiKey } from "@/lib/openrouter-keys";
 import { logModelUsage } from "@/lib/model-usage";
 import { openRouterErrorResponse } from "@/lib/openrouter-error";
+import { enforceCredits } from "@/lib/enforce-credits";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   const apiKey = await getActiveApiKey();
   if (!apiKey) return new Response("OpenRouter not configured", { status: 500 });
-
-  const auth = adminAuth();
-  if (auth) {
-    const token = req.headers.get("Authorization")?.slice(7);
-    if (!token) return new Response("Unauthorized", { status: 401 });
-    try { await auth.verifyIdToken(token); } catch { return new Response("Invalid token", { status: 401 }); }
-  }
 
   const { transactions, question, model, memories } = await req.json() as {
     transactions: string;
@@ -24,6 +17,9 @@ export async function POST(req: NextRequest) {
     memories?: string[];
   };
   if (!transactions || !question || !model) return new Response("Missing fields", { status: 400 });
+
+  const credit = await enforceCredits(req, model, `finance:${model}`);
+  if (credit.error) return credit.error;
 
   let systemPrompt = `You are a personal finance analyst. The user will share their transaction data and ask questions. Be specific, actionable, and honest. Format your response clearly with bullet points or sections where helpful.`;
 
@@ -49,7 +45,7 @@ export async function POST(req: NextRequest) {
 
   if (!upstream.ok) return openRouterErrorResponse(upstream);
 
-  logModelUsage(model).catch(() => {});
+  logModelUsage(model, "finance", credit.uid).catch(() => {});
 
   return new Response(upstream.body, {
     headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "X-Accel-Buffering": "no" },
